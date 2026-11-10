@@ -21,6 +21,7 @@ VERIFIED_AGAINST_LIVE_API = False
 CURRENT = "https://api.openweathermap.org/data/2.5/weather"
 ONECALL = "https://api.openweathermap.org/data/3.0/onecall"
 HISTORY = "https://history.openweathermap.org/data/2.5/history/city"
+HISTORY_TIMESTAMP = "https://history.openweathermap.org/data/3.0/history/timemachine"
 KIND = "blended_measured_and_model_unverified"
 
 
@@ -41,6 +42,31 @@ def day_summary(lat, lon, date, units="metric", **kw):
 def history_hourly(lat, lon, start_unix, end_unix, units="metric", **kw):
     return http.call("GET", HISTORY, secret=_key(), params={
         "lat": lat, "lon": lon, "type": "hour", "start": int(start_unix), "end": int(end_unix), "units": units}, **kw)[1]
+
+
+def history_timestamp(lat, lon, dt_unix, **kw):
+    """Retrieve one historical observation using OpenWeather Timestamp History API."""
+    return http.call("GET", HISTORY_TIMESTAMP, secret=_key(), params={
+        "lat": lat, "lon": lon, "dt": int(dt_unix)}, **kw)[1]
+
+
+def parse_history_timestamp(payload, location, lat, lon):
+    """Parse one Timestamp History API observation; source temperatures are Kelvin."""
+    if not isinstance(payload, dict) or not payload.get("dt"):
+        raise ValueError("timestamp history response has no valid 'dt' field")
+    ts = pd.to_datetime(payload["dt"], unit="s", utc=True).tz_localize(None)
+    temp_k = _dig(payload, ("main", "temp"))
+    items = [
+        ("temp", float(temp_k) - 273.15 if temp_k is not None else None, "C", "hourly_instantaneous"),
+        ("pressure", _dig(payload, ("main", "pressure")), "hPa", "hourly_instantaneous"),
+        ("humidity", _dig(payload, ("main", "humidity")), "%", "hourly_instantaneous"),
+        ("wind_speed", _dig(payload, ("wind", "speed")), "m/s", "hourly_instantaneous"),
+        ("cloud_cover", _dig(payload, ("clouds", "all")), "%", "hourly_instantaneous"),
+        ("rain_1h", _dig(payload, ("rain", "1h")), "mm", "hourly_accumulation"),
+    ]
+    rows = _rows(ts, items, location, lat, lon, "OpenWeather Timestamp History API",
+                 "timestamp_observation", "documented_kelvin_to_celsius")
+    return pd.DataFrame(rows, columns=STANDARD_COLUMNS)
 
 
 def _rows(date, items, location, lat, lon, source, statistic_default, unit_source):

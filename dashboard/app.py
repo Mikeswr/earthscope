@@ -179,6 +179,15 @@ def fetch_openweather_history_probe(lat, lon):
     return payload, parsed, start, end
 
 @st.cache_data(ttl=3600, show_spinner=False)
+def fetch_openweather_timestamp_probe(lat, lon):
+    """Test one timestamp from January 2020 using the separate Timestamp History API."""
+    timestamp = pd.Timestamp("2020-01-15 12:00:00", tz="UTC")
+    payload = owm.history_timestamp(float(lat), float(lon), int(timestamp.timestamp()))
+    parsed = owm.parse_history_timestamp(payload, "Selected location", float(lat), float(lon))
+    return payload, parsed, timestamp
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_openweather_archive_probe(lat, lon):
     """Test whether the account can retrieve a historical date well before the recent window."""
     start = pd.Timestamp("2020-01-15 00:00:00", tz="UTC")
@@ -352,6 +361,28 @@ with owtab:
             st.warning(f"Historical access was not confirmed. HTTP status: {e.status}. {e.hint or 'Check the account subscription and endpoint permissions.'}")
         except (KeyError, TypeError, ValueError) as e:
             st.warning(f"The endpoint response did not pass the parser check: {e}")
+
+
+    st.markdown("### Test timestamp history (January 2020)")
+    st.write("This is a separate OpenWeather endpoint. It requests one observation at 12:00 UTC on 15 January 2020. It does not change or merge with the NASA POWER dataset.")
+    if st.button("Test timestamp history (January 2020)", key="test_openweather_timestamp"):
+        try:
+            with st.spinner("Testing the OpenWeather timestamp endpoint..."):
+                timestamp_payload, timestamp_sample, timestamp_requested = fetch_openweather_timestamp_probe(
+                    row["latitude"], row["longitude"]
+                )
+            if timestamp_payload.get("dt") and not timestamp_sample.empty:
+                returned_at = pd.to_datetime(timestamp_payload["dt"], unit="s", utc=True)
+                st.success(f"Timestamp history access confirmed for {loc}.")
+                st.caption(f"Requested: {timestamp_requested:%Y-%m-%d %H:%M} UTC · Returned: {returned_at:%Y-%m-%d %H:%M} UTC.")
+                st.dataframe(timestamp_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")
+                st.caption("Temperature was converted from Kelvin to Celsius using the documented Timestamp History response units.")
+            else:
+                st.warning("The endpoint responded, but did not return a valid timestamp observation.")
+        except api_http.ApiError as e:
+            st.warning(f"Timestamp history access was not confirmed. {str(e)}")
+        except (KeyError, TypeError, ValueError) as e:
+            st.warning(f"The timestamp response did not pass validation: {e}")
 
     st.markdown("### Test access to an older archive date")
     st.write("The first test confirms recent hourly history. This second test requests 24 hours from 15 January 2020 to establish whether the same endpoint can retrieve older archive records.")
