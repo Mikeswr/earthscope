@@ -13,7 +13,7 @@ Workflow with downloaded NASA POWER files (details in docs/MANUAL_DOWNLOAD.md)
 3. python scripts/run_analysis.py                       QC tables, trends, sensitivity runs, comparison tables
 4. python scripts/make_figures.py                       figures
 5. python scripts/make_reports.py                       four markdown reports from the tables
-6. streamlit run earthscope/dashboard/app.py            dashboard
+6. streamlit run dashboard/app.py            dashboard
 With internet access, scripts/fetch_power.py downloads the files itself. scripts/inspect_file.py prints a file's structure without values.
 
 Outputs

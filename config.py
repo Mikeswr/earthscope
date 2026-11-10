@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env")
 
 GHANA_BBOX = (-3.26, 4.74, 1.20, 11.17)  # west, south, east, north
