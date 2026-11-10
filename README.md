@@ -5,7 +5,7 @@ Environmental trend analysis for Ghana from NASA POWER monthly data, with a Stre
 Setup
 1. python -m venv .venv and activate it
 2. pip install -r requirements.txt
-3. Credentials are only needed for the OpenWeather and Agromonitoring clients (docs/CREDENTIALS.md). Never share keys in chat.
+3. OpenWeather current conditions require OPENWEATHER_API_KEY. In Streamlit Community Cloud, add it under App settings → Secrets as OPENWEATHER_API_KEY = "your_api_key". Locally, set it as an environment variable or in .env. Never commit or share API keys. Agromonitoring credentials are only needed for its separate client.
 
 Workflow with downloaded NASA POWER files (details in docs/MANUAL_DOWNLOAD.md)
 1. python scripts/validate_power_files.py <folder>      checks the files, changes nothing
@@ -31,5 +31,5 @@ The tests use synthetic data labelled SYNTHETIC TEST DATA. If such data is ever 
 
 Status
 Done and run on the five real NASA POWER files: validation, import, QC, trend analysis, sensitivity runs, figures, reports.
-Not verified: agreement of POWER values with station records; the OpenWeather and Agromonitoring clients against live responses (they are marked unverified and unused by the reports).
+Not verified: agreement of POWER values with station records; live OpenWeather and Agromonitoring responses. The dashboard now has a separate OpenWeather current-conditions panel, but it requires the user's API key and has not yet been tested against that live account. OpenWeather current conditions are not included in NASA POWER trend calculations. Historical OpenWeather integration remains gated on confirming endpoint entitlement and live response structure.
 Not built: a covariance corrected seasonal test, gridded spatial trend maps (needs gridded input), deployment, Space Apps submission materials.

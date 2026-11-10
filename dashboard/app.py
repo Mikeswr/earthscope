@@ -11,6 +11,8 @@ from earthscope.dashboard.data import load_data
 from earthscope.qc import checks
 from earthscope.spatial.grid import point_trend_map
 from earthscope.trends.pipeline import annual_series, monthly_series
+from earthscope.ingest import openweather as owm
+from earthscope.ingest import http as api_http
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
@@ -160,6 +162,11 @@ def name(code): return INFO.get(code,(config.VARIABLE_LABELS.get(code,code),"","
 def desc(code): return INFO.get(code,("","Definition not yet available.",""))[1]
 def number(v,d=3): return "Not available" if pd.isna(v) else f"{v:,.{d}f}"
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_openweather_current(lat, lon):
+    """Fetch one current-conditions snapshot; cache for ten minutes."""
+    return owm.current_weather(float(lat), float(lon), units="metric")
+
 data=load_data()
 if data is None:
     st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation</div><h1>EarthScope</h1><p>Understand how environmental conditions change across time and place.</p></div>',unsafe_allow_html=True)
@@ -197,7 +204,7 @@ c.metric("Estimated change per decade",f"{number(row['sen_per_decade'])} {unit}"
 d.metric("FDR-adjusted p-value",number(row["mk_p_fdr"],4),help="Multiple-testing-adjusted statistical evidence, not the probability that a trend is true.")
 st.caption("NASA POWER historical monthly data. These are gridded estimates, not direct weather-station observations.")
 
-ts,tr,an,mp,qc,about=st.tabs(["Explore time series","Compare trends","Unusual conditions","Location map","Data quality","Methods & sources"])
+ts,tr,an,mp,qc,about,owtab=st.tabs(["Explore time series","Compare trends","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -264,6 +271,42 @@ with about:
     st.dataframe(glossary,hide_index=True,width="stretch")
     st.markdown("#### Source metadata")
     st.dataframe(pd.DataFrame(meta.get("variables",{})).T.drop(columns=["response_parameter_metadata_verbatim"],errors="ignore"),width="stretch")
+
+
+with owtab:
+    st.markdown("### Current weather conditions")
+    st.write("A separate, recent snapshot from OpenWeather for the selected location. This is not part of the NASA POWER historical trend analysis.")
+    if not config.get_key(config.ENV_OPENWEATHER):
+        st.info('OpenWeather is not connected yet. In Streamlit Community Cloud, open the app settings, go to Secrets, and add OPENWEATHER_API_KEY = "your_api_key". Keep the key private. The dashboard will use it automatically after the app restarts.')
+    else:
+        try:
+            ow = fetch_openweather_current(row["latitude"], row["longitude"])
+            main = ow["main"]
+            wind = ow.get("wind", {})
+            weather_items = ow.get("weather") or []
+            condition = weather_items[0].get("description", "Conditions not described") if weather_items else "Conditions not described"
+            st.markdown(f"**{loc}** · {condition.title()}")
+            w1, w2, w3, w4 = st.columns(4)
+            w1.metric("Air temperature", f"{number(main.get('temp'), 1)} °C")
+            w2.metric("Feels like", f"{number(main.get('feels_like'), 1)} °C")
+            w3.metric("Relative humidity", f"{number(main.get('humidity'), 0)} %")
+            w4.metric("Wind speed", f"{number(wind.get('speed'), 1)} m/s")
+            x1, x2, x3 = st.columns(3)
+            x1.metric("Air pressure", f"{number(main.get('pressure'), 0)} hPa")
+            x2.metric("Cloud cover", f"{number(ow.get('clouds', {}).get('all'), 0)} %")
+            x3.metric("Visibility", f"{number(ow.get('visibility') / 1000, 1)} km" if ow.get("visibility") is not None else "Not available")
+            offset = int(ow.get("timezone", 0) or 0)
+            observed_at = pd.to_datetime(ow["dt"], unit="s", utc=True) + pd.to_timedelta(offset, unit="s")
+            st.caption(f"OpenWeather Current Weather API · API timestamp: {observed_at.strftime('%Y-%m-%d %H:%M')} local time · Cached for up to 10 minutes.")
+            st.caption("OpenWeather current conditions can combine multiple data inputs. They are shown as a recent snapshot, not as a station observation or a climate trend.")
+        except api_http.ApiError as e:
+            st.warning(f"OpenWeather could not return data for this location. HTTP status: {e.status}. {e.hint or 'Check the API key and endpoint access.'}")
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            st.warning("OpenWeather returned a response that did not match the expected structure. The NASA POWER analysis remains available.")
+
+    with st.expander("How this source is used"):
+        st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. A historical OpenWeather series will only be added after the relevant historical endpoint and live response structure are verified.")
+
 
 st.divider()
 st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
