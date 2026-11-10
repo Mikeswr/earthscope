@@ -1,122 +1,149 @@
 import sys
 from pathlib import Path
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-
 from earthscope import config
 from earthscope.dashboard.data import load_data
 from earthscope.qc import checks
 from earthscope.spatial.grid import point_trend_map
 from earthscope.trends.pipeline import annual_series, monthly_series
 
-st.set_page_config(page_title="EarthScope", layout="wide")
-st.title("EarthScope")
-st.caption("Environmental trend analysis for Ghana")
+st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
-data = load_data()
+st.markdown("""
+<style>
+.stApp{background:#F7F8F6}.block-container{padding-top:2rem;max-width:1450px}
+[data-testid="stSidebar"]{background:#EEF3F1}
+[data-testid="stMetric"]{background:white;border:1px solid #E2EAE6;padding:14px;border-radius:13px}
+.hero{background:linear-gradient(115deg,#102F40,#176E73);color:white;padding:30px 34px;border-radius:18px;margin-bottom:22px}
+.hero h1{color:white;font-size:2.4rem;margin:0 0 6px}.hero p{color:#D7EAE7;margin:0;font-size:1.05rem}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#A8DCD0;font-size:.72rem;font-weight:700;margin-bottom:8px}
+.note{background:#EAF3F0;border-left:4px solid #238B83;padding:12px 16px;border-radius:7px;margin:8px 0 18px}
+div[data-testid="stTabs"] button[aria-selected="true"]{color:#147C78}
+</style>
+""", unsafe_allow_html=True)
+
+INFO = {
+"T2M":("Air temperature at 2 metres","Average air temperature about 2 metres above the surface.","°C"),
+"T2M_MAX":("Highest air temperature at 2 metres","Highest hourly air-temperature value within each month.","°C"),
+"T2M_MIN":("Lowest air temperature at 2 metres","Lowest hourly air-temperature value within each month.","°C"),
+"PRECTOTCORR":("Corrected precipitation rate","Bias-corrected average daily precipitation rate. This is not the month's accumulated rainfall total.","mm/day"),
+"RH2M":("Relative humidity at 2 metres","How close the air is to saturation with water vapour, expressed as a percentage.","%"),
+"WS10M":("Wind speed at 10 metres","Wind speed estimated 10 metres above the surface.","m/s"),
+"ALLSKY_SFC_SW_DWN":("Solar energy reaching the surface","Downward shortwave solar energy at the surface under all-sky conditions.","kWh/m²/day")
+}
+def name(code): return INFO.get(code,(config.VARIABLE_LABELS.get(code,code),"",""))[0]
+def desc(code): return INFO.get(code,("","Definition not yet available.",""))[1]
+def number(v,d=3): return "Not available" if pd.isna(v) else f"{v:,.{d}f}"
+
+data=load_data()
 if data is None:
-    st.info("No data loaded yet. This dashboard only shows real downloaded data and never generates "
-            "placeholder values.")
-    st.markdown(
-        "1. Download NASA POWER monthly files (see docs/MANUAL_DOWNLOAD.md)\n"
-        "2. Run `python scripts/import_power.py <files>`\n"
-        "3. Run `python scripts/run_trends.py`, then reload this page")
+    st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation</div><h1>EarthScope</h1><p>Understand how environmental conditions change across time and place.</p></div>',unsafe_allow_html=True)
+    st.info("No processed dataset is available. EarthScope does not generate placeholder environmental values.")
     st.stop()
+df,trends,anoms,meta=data["df"],data["trends"],data["anoms"],data["meta"]
+if (df["source"]=="SYNTHETIC TEST DATA").any():
+    st.error("SYNTHETIC TEST DATA is loaded. Do not interpret or report these values.")
 
-df, trends, anoms, meta = data["df"], data["trends"], data["anoms"], data["meta"]
+st.sidebar.markdown("## Explore the data")
+st.sidebar.caption("Choose a location and environmental variable.")
+loc=st.sidebar.selectbox("Study location",sorted(df["location"].unique()))
+var=st.sidebar.selectbox("Environmental variable",sorted(df["variable"].unique()),format_func=lambda v:f"{name(v)} · {v}")
+sel=df[(df.location==loc)&(df.variable==var)]
+unit=sel.unit.iat[0]
+row=trends[(trends.location==loc)&(trends.variable==var)].iloc[0]
+st.sidebar.markdown(f"**{name(var)}**")
+st.sidebar.caption(f"NASA parameter: {var}")
+st.sidebar.write(desc(var))
+st.sidebar.caption(f"Source: {', '.join(sorted(sel.source.unique()))}")
+st.sidebar.caption(f"Data type: {', '.join(sorted(sel.data_kind.unique())).replace('_',' ')}")
+if (df.unit_source!="response_metadata").any():
+    st.sidebar.warning("Some units were assumed from documentation rather than read from source metadata.")
 
-if (df["source"] == "SYNTHETIC TEST DATA").any():
-    st.error("SYNTHETIC TEST DATA is loaded. These are software test values, not environmental "
-             "observations. Do not interpret or report them.")
+st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation · Environmental change</div><h1>EarthScope</h1><p>Explore what is changing, where it is changing, and how strong the evidence is.</p></div>',unsafe_allow_html=True)
+st.markdown(f"### {loc} / {name(var)}")
+st.markdown(f'<div class="note">{desc(var)} <b>NASA parameter:</b> {var} · <b>Unit:</b> {unit}</div>',unsafe_allow_html=True)
 
-st.sidebar.header("Selection")
-loc = st.sidebar.selectbox("Location", sorted(df["location"].unique()))
-var = st.sidebar.selectbox("Variable", sorted(df["variable"].unique()),
-                           format_func=lambda v: f"{v}: {config.VARIABLE_LABELS.get(v, v)}")
-st.sidebar.markdown(f"**Data kind:** {', '.join(sorted(df['data_kind'].unique()))}")
-st.sidebar.markdown(f"**Source:** {', '.join(sorted(df['source'].unique()))}")
-if (df["unit_source"] != "response_metadata").any():
-    st.sidebar.warning("Some units were ASSUMED from documentation, not read from the NASA response.")
+m=monthly_series(sel)
+ann=annual_series(m,how=config.annual_how(var)).dropna()
+a,b,c,d=st.columns(4)
+a.metric("Valid years",str(int(row["n_years"])) if pd.notna(row["n_years"]) else "n/a")
+b.metric("Trend direction",str(row["mk_trend"]).replace("_"," ").title())
+c.metric("Estimated change per decade",f"{number(row['sen_per_decade'])} {unit}" if pd.notna(row["sen_per_decade"]) else "n/a")
+d.metric("FDR-adjusted p-value",number(row["mk_p_fdr"],4),help="Multiple-testing-adjusted statistical evidence, not the probability that a trend is true.")
+st.caption("NASA POWER historical monthly data. These are gridded estimates, not direct weather-station observations.")
 
-sel = df[(df["location"] == loc) & (df["variable"] == var)]
-unit = sel["unit"].iat[0]
-row = trends[(trends["location"] == loc) & (trends["variable"] == var)].iloc[0]
-st.sidebar.markdown(f"**Statistic:** {sel['statistic'].iat[0].replace('_', ' ')}")
+ts,tr,an,mp,qc,about=st.tabs(["Explore time series","Compare trends","Unusual conditions","Location map","Data quality","Methods & sources"])
+with ts:
+    st.markdown("### How has this variable changed?")
+    st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=m.index,y=m.values,mode="lines",name="Monthly values",line=dict(width=1.2,color="#2386C8")))
+    fig.add_trace(go.Scatter(x=[f"{y}-07-01" for y in ann.index],y=ann.values,mode="markers",name="Annual summary",marker=dict(size=6,color="#F2A65A")))
+    if not np.isnan(row["sen_per_decade"]) and len(ann):
+        slope=row["sen_per_decade"]/10
+        intercept=float(np.median(ann.values-slope*ann.index.values))
+        years=np.array([ann.index.min(),ann.index.max()])
+        fig.add_trace(go.Scatter(x=[f"{y}-07-01" for y in years],y=intercept+slope*years,mode="lines",name="Sen's slope",line=dict(dash="dash",width=3,color="#D95745")))
+    fig.update_layout(yaxis_title=f"{name(var)} ({unit})",height=440,legend=dict(orientation="h",y=-.2),hovermode="x unified",plot_bgcolor="white",paper_bgcolor="white")
+    st.plotly_chart(fig,width="stretch")
+    st.info("Short-term peaks and dips do not, by themselves, establish a long-term climate trend.")
+    if pd.notna(row["mk_reason"]) and row["mk_reason"]: st.warning(f"No annual trend reported: {row['mk_reason']}")
+    with st.expander("What do the statistics mean?"):
+        st.markdown("- **Sen's slope:** estimated rate of change per decade.\n- **Mann-Kendall:** tests evidence of a monotonic upward or downward trend.\n- **FDR-adjusted p-value:** accounts for testing several location-variable combinations.\n- Statistical significance does not identify the physical cause of a change.")
 
-tab_ts, tab_tr, tab_an, tab_map, tab_qc, tab_about = st.tabs(
-    ["Time series", "Trends", "Anomalies", "Map", "Data quality", "About the data"])
+with tr:
+    st.markdown("### How do locations compare?")
+    st.write(f"Trend estimates for {name(var)} across the study locations.")
+    cols=["location","n_years","sen_per_decade","sen_ci_low_per_decade","sen_ci_high_per_decade","mk_trend","mk_p","mk_p_fdr","evidence_class"]
+    table=trends[trends.variable==var][cols].copy().rename(columns={"location":"Location","n_years":"Valid years","sen_per_decade":f"Sen's slope ({unit}/decade)","sen_ci_low_per_decade":"95% CI lower","sen_ci_high_per_decade":"95% CI upper","mk_trend":"Trend direction","mk_p":"Raw p-value","mk_p_fdr":"FDR-adjusted p-value","evidence_class":"Evidence classification"})
+    st.dataframe(table.round(4),hide_index=True,width="stretch")
+    st.download_button("Download complete trend results (CSV)",trends.to_csv(index=False),"earthscope_trend_results.csv","text/csv")
+    fam=trends[trends.variable==var].fdr_family.iloc[0]
+    family_n=int(trends[trends.fdr_family==fam].mk_p.notna().sum())
+    st.caption(f"FDR correction family: {fam.replace('_',' ')} ({family_n} valid tests). Annual Mann-Kendall approximately accounts for lag-1 autocorrelation. A year requires all 12 valid months. Seasonal p-values are not used for significance claims because neighbouring months are correlated.")
+    with st.expander("How should I read the evidence classification?"):
+        st.markdown("- **Significant after FDR:** adjusted p-value below 0.05.\n- **Significant before FDR only:** raw p-value below 0.05, but adjusted result is not.\n- **Not significant:** insufficient statistical evidence of a monotonic trend.\n- **Insufficient data:** minimum data requirements were not met.")
 
-with tab_ts:
-    m = monthly_series(sel)
-    ann = annual_series(m, how=config.annual_how(var)).dropna()
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=m.index, y=m.values, mode="lines", name="Monthly", line=dict(width=1)))
-    fig.add_trace(go.Scatter(x=[f"{y}-07-01" for y in ann.index], y=ann.values, mode="markers",
-                             name="Annual mean"))
-    if not np.isnan(row["sen_per_decade"]):
-        slope = row["sen_per_decade"] / 10
-        icpt = float(np.median(ann.values - slope * ann.index.values))
-        yrs = np.array([ann.index.min(), ann.index.max()])
-        fig.add_trace(go.Scatter(x=[f"{y}-07-01" for y in yrs], y=icpt + slope * yrs, mode="lines",
-                                 name="Sen's slope (annual)", line=dict(dash="dash", width=3)))
-    fig.update_layout(yaxis_title=f"{var} ({unit})", height=450, legend=dict(orientation="h"))
-    st.plotly_chart(fig, width="stretch")
-    if pd.notna(row["mk_reason"]) and row["mk_reason"]:
-        st.warning(f"No annual trend reported: {row['mk_reason']}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Sen's slope per decade", "n/a" if np.isnan(row["sen_per_decade"]) else f"{row['sen_per_decade']:.3f} {unit}")
-    c2.metric("Mann-Kendall", str(row["mk_trend"]))
-    c3.metric("p value (FDR adjusted)", "n/a" if np.isnan(row["mk_p_fdr"]) else f"{row['mk_p_fdr']:.4f}")
+with an:
+    st.markdown("### When did unusual conditions occur?")
+    st.write("An anomaly differs from the typical value for that calendar month in the 1991–2020 reference period.")
+    z=anoms[(anoms.location==loc)&(anoms.variable==var)]
+    flagged=z[z.flag]
+    fig=go.Figure(go.Scatter(x=z.date,y=z.z,mode="lines",name="Standardised anomaly",line=dict(width=1.1,color="#2386C8")))
+    fig.add_trace(go.Scatter(x=flagged.date,y=flagged.z,mode="markers",name="Flagged |z| ≥ 2",marker=dict(size=8,color="#D95745")))
+    fig.add_hline(y=2,line_dash="dot",line_color="#D95745",opacity=.6)
+    fig.add_hline(y=-2,line_dash="dot",line_color="#D95745",opacity=.6)
+    fig.update_layout(yaxis_title="Standardised anomaly (z-score)",height=400,plot_bgcolor="white",paper_bgcolor="white")
+    st.plotly_chart(fig,width="stretch")
+    st.caption("Red markers identify observations at least two standard deviations from the calendar-month climatology. An anomaly is not automatically a long-term trend or proof of an extreme event.")
+    st.metric("Flagged observations",f"{len(flagged):,}")
+    st.dataframe(flagged[["date","value","anomaly","z"]].round({"value":3,"anomaly":3,"z":3}),hide_index=True,width="stretch")
 
-with tab_tr:
-    t = trends[trends["variable"] == var][[
-        "location", "n_years", "n_years_span", "sen_per_decade", "mk_trend", "mk_p", "significant_uncorrected",
-        "mk_p_fdr", "significant_fdr", "variance_factor", "seasonal_trend", "seasonal_sen_per_decade", "seasonal_p",
-        "mk_reason", "seasonal_reason"]]
-    st.dataframe(t.round(4), hide_index=True, width="stretch")
-    st.download_button("Download all trend results (CSV)", trends.to_csv(index=False),
-                       "trend_results.csv", "text/csv")
-    st.caption("Annual Mann-Kendall inflates its variance for lag-1 autocorrelation (effective sample size); "
-               "Sen's slope uses actual elapsed years, so missing years do not distort it. A year needs all 12 "
-               "valid months. 'significant_uncorrected' is p < 0.05 with no multiplicity control; 'significant_fdr' "
-               f"is after Benjamini-Hochberg across {int(trends['n_tests_in_family'].max())} tests. The seasonal "
-               "test treats calendar months as independent, so its p value is optimistic when neighbouring "
-               "months are correlated; prefer the annual test for significance statements. Series that miss "
-               "the minimum-data rules are shown with a reason instead of a number.")
+with mp:
+    st.markdown("### Where do the location results differ?")
+    st.write("Each marker represents one configured NASA POWER grid-cell location.")
+    st.plotly_chart(point_trend_map(trends,var),width="stretch")
+    st.warning("This is a map of five point results, not an interpolated continuous spatial trend field.")
 
-with tab_an:
-    a = anoms[(anoms["location"] == loc) & (anoms["variable"] == var)]
-    fig = go.Figure(go.Scatter(x=a["date"], y=a["z"], mode="lines", name="z score", line=dict(width=1)))
-    fl = a[a["flag"]]
-    fig.add_trace(go.Scatter(x=fl["date"], y=fl["z"], mode="markers", name="|z| >= 2",
-                             marker=dict(size=9, color="crimson")))
-    fig.update_layout(yaxis_title="Standardised anomaly (z)", height=400)
-    st.plotly_chart(fig, width="stretch")
-    st.caption("Anomalies are relative to a 1991 to 2020 monthly climatology of this same record.")
-    st.dataframe(fl[["date", "value", "anomaly", "z"]].round({"value": 3, "anomaly": 3, "z": 3}),
-                 hide_index=True, width="stretch")
+with qc:
+    st.markdown("### How complete and reliable is the dataset?")
+    st.dataframe(checks.completeness(df).round({"pct_valid":1}),hide_index=True,width="stretch")
+    st.dataframe(df.qc_flag.value_counts().rename_axis("Flag").reset_index(name="Records"),hide_index=True,width="stretch")
+    st.caption("Missing or flagged values remain at their original calendar positions and are excluded from calculations. They are not interpolated.")
 
-with tab_map:
-    st.plotly_chart(point_trend_map(trends, var), width="stretch")
-    st.caption("Point results at configured locations only. This is not an interpolated spatial field. "
-               "Gridded trend maps need gridded input data.")
+with about:
+    st.markdown("### Understand the data behind EarthScope")
+    st.markdown("**NASA POWER** provides gridded environmental estimates derived from satellite observations and modelling/reanalysis systems. These are not direct weather-station measurements. Each selected location represents a separate grid-cell time series. Five locations do not form a continuous map of Ghana. No forecasts are produced by this analysis.")
+    glossary=pd.DataFrame([{"NASA code":k,"Plain-language name":v[0],"What it measures":v[1],"Unit":v[2]} for k,v in INFO.items() if k in set(df.variable)])
+    st.markdown("#### Variable reference")
+    st.dataframe(glossary,hide_index=True,width="stretch")
+    st.markdown("#### Source metadata")
+    st.dataframe(pd.DataFrame(meta.get("variables",{})).T.drop(columns=["response_parameter_metadata_verbatim"],errors="ignore"),width="stretch")
 
-with tab_qc:
-    st.dataframe(checks.completeness(df).round({"pct_valid": 1}), hide_index=True, width="stretch")
-    st.write(df["qc_flag"].value_counts().rename_axis("flag").reset_index(name="count"))
-
-with tab_about:
-    st.write("NASA POWER values are gridded estimates built from reanalysis and satellite based sources. They are not direct "
-             "station observations. Each location is a separate grid cell series; five points are not a spatial trend map. "
-             "No forecasts are produced in this version.")
-    st.write("Variable definitions follow NASA POWER documentation as understood by the developer and are "
-             "marked unverified until checked against real response metadata. Spatial resolution is shown "
-             "only if the response states it.")
-    st.dataframe(pd.DataFrame(meta.get("variables", {})).T.drop(columns=["response_parameter_metadata_verbatim"],
-                                                               errors="ignore"), width="stretch")
-    st.json(meta)
+st.divider()
+st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
