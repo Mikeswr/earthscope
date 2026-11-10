@@ -112,10 +112,19 @@ def load_locations(path=None):
 
 
 def get_key(name):
-    """Credential lookup: environment variable first, then .streamlit/secrets.toml. Never logged."""
+    """Credential lookup: environment, Streamlit Cloud secrets, then local secrets file."""
     value = os.environ.get(name)
     if value:
         return value
+    # Streamlit Community Cloud exposes configured secrets through st.secrets.
+    # Import lazily so command-line ingestion does not require an active Streamlit runtime.
+    try:
+        import streamlit as st
+        value = st.secrets.get(name)
+        if value:
+            return str(value)
+    except Exception:
+        pass
     secrets = ROOT / ".streamlit" / "secrets.toml"
     if secrets.exists():
         import tomllib

@@ -279,8 +279,13 @@ with owtab:
     if not config.get_key(config.ENV_OPENWEATHER):
         st.info('OpenWeather is not connected yet. In Streamlit Community Cloud, open the app settings, go to Secrets, and add OPENWEATHER_API_KEY = "your_api_key". Keep the key private. The dashboard will use it automatically after the app restarts.')
     else:
-        try:
-            ow = fetch_openweather_current(row["latitude"], row["longitude"])
+        if "ow_current_requested" not in st.session_state:
+            st.session_state["ow_current_requested"] = False
+        if st.button("Load or refresh current conditions", key="load_openweather_current"):
+            st.session_state["ow_current_requested"] = True
+        if st.session_state["ow_current_requested"]:
+            try:
+                ow = fetch_openweather_current(row["latitude"], row["longitude"])
             main = ow["main"]
             wind = ow.get("wind", {})
             weather_items = ow.get("weather") or []
@@ -299,10 +304,10 @@ with owtab:
             observed_at = pd.to_datetime(ow["dt"], unit="s", utc=True) + pd.to_timedelta(offset, unit="s")
             st.caption(f"OpenWeather Current Weather API · API timestamp: {observed_at.strftime('%Y-%m-%d %H:%M')} local time · Cached for up to 10 minutes.")
             st.caption("OpenWeather current conditions can combine multiple data inputs. They are shown as a recent snapshot, not as a station observation or a climate trend.")
-        except api_http.ApiError as e:
-            st.warning(f"OpenWeather could not return data for this location. HTTP status: {e.status}. {e.hint or 'Check the API key and endpoint access.'}")
-        except (KeyError, TypeError, ValueError, ZeroDivisionError):
-            st.warning("OpenWeather returned a response that did not match the expected structure. The NASA POWER analysis remains available.")
+            except api_http.ApiError as e:
+                st.warning(f"OpenWeather could not return data for this location. HTTP status: {e.status}. {e.hint or 'Check the API key and endpoint access.'}")
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                st.warning("OpenWeather returned a response that did not match the expected structure. The NASA POWER analysis remains available.")
 
     with st.expander("How this source is used"):
         st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. A historical OpenWeather series will only be added after the relevant historical endpoint and live response structure are verified.")
