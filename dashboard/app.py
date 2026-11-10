@@ -180,16 +180,6 @@ def fetch_openweather_history_probe(lat, lon):
     return payload, parsed, start, end
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_agromonitoring_archive(lat, lon, date_text):
-    day = pd.Timestamp(date_text, tz="UTC")
-    start = day
-    end = start + pd.Timedelta(hours=24)
-    payload = agro.weather_history(float(lat), float(lon), int(start.timestamp()), int(end.timestamp()))
-    parsed = agro.parse_weather_history(payload, "Selected location", float(lat), float(lon))
-    return payload, parsed, start, end
-
-
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_agromonitoring_current(lat, lon):
     return agro.current_weather(float(lat), float(lon))
@@ -414,44 +404,6 @@ with agtab:
                 st.warning(f"Agromonitoring current-weather request failed: {str(e)}")
             except (KeyError, TypeError, ValueError) as e:
                 st.warning(f"Agromonitoring response could not be read: {e}")
-
-        st.markdown("### Test an older historical date")
-        st.write("Checks whether your Agromonitoring subscription can retrieve weather from an earlier period. The available archive depth is subscription-dependent.")
-        archive_date = st.date_input(
-            "Choose an archive date",
-            value=pd.Timestamp("2020-01-15").date(),
-            min_value=pd.Timestamp("1980-01-01").date(),
-            max_value=pd.Timestamp.now(tz="UTC").date(),
-            key="agro_archive_date",
-        )
-        if st.button("Test older historical weather", key="test_agro_archive"):
-            try:
-                with st.spinner("Checking Agromonitoring archive access..."):
-                    old_payload, old_sample, old_start, old_end = fetch_agromonitoring_archive(
-                        row["latitude"], row["longitude"], archive_date.isoformat()
-                    )
-                if old_payload and not old_sample.empty:
-                    st.success(f"Older historical access confirmed. Returned {len(old_payload)} hourly records for {loc}.")
-                    st.caption(f"Requested UTC window: {old_start:%Y-%m-%d %H:%M} to {old_end:%Y-%m-%d %H:%M}.")
-                    old_vars = sorted(old_sample["variable"].unique())
-                    old_labels = {"temp":"Air temperature","humidity":"Relative humidity","pressure":"Air pressure","wind_speed":"Wind speed","cloud_cover":"Cloud cover"}
-                    old_choice = st.selectbox(
-                        "Archive variable",
-                        old_vars,
-                        format_func=lambda v: f"{old_labels.get(v,v)} ({old_sample.loc[old_sample.variable==v,'unit'].iloc[0]})",
-                        key="agro_archive_variable",
-                    )
-                    old_series = old_sample[old_sample.variable==old_choice].sort_values("date")
-                    old_fig = go.Figure(go.Scatter(x=old_series.date,y=old_series.value,mode="lines+markers",name=old_labels.get(old_choice,old_choice)))
-                    old_fig.update_layout(title=f"{old_labels.get(old_choice,old_choice)} · historical archive",xaxis_title="Time (UTC)",yaxis_title=old_series.unit.iloc[0],height=360,hovermode="x unified",plot_bgcolor="white",paper_bgcolor="white")
-                    st.plotly_chart(old_fig,width="stretch")
-                    st.dataframe(old_series[["date","value","unit"]],hide_index=True,width="stretch")
-                else:
-                    st.warning("The API returned no hourly observations for this date. This date may be outside your subscription's archive window.")
-            except api_http.ApiError as e:
-                st.warning(f"Older Agromonitoring archive access was not confirmed: {str(e)}")
-            except (KeyError, TypeError, ValueError) as e:
-                st.warning(f"The older archive response could not be validated: {e}")
 
         st.markdown("### Test recent historical weather")
         st.write("Requests the latest 24 hourly timestamps. If your plan permits historical access, the response will be plotted below. We can then test deeper archive periods.")
