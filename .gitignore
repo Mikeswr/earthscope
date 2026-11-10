@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/raw/
+data/processed/*
+!data/processed/
+!data/processed/power_monthly_standardised.csv
+!data/processed/trend_results.csv
+!data/processed/anomalies.csv
+!data/processed/power_monthly_metadata.json

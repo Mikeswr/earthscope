@@ -1,0 +1,962 @@
+{
+  "built_utc": "2026-11-10T12:55:28+00:00",
+  "files": [
+    {
+      "name": "power_monthly_Accra_1981_2025.json",
+      "bytes": 61284,
+      "sha256": "f1d4ece6f5b8e6b82d259c763fc209ce08fe08648ac277d7dfd8ba24e3bea4e0",
+      "format": "json",
+      "fetch_record": null,
+      "import_record": {
+        "original_filename": "POWER_Point_Monthly_19810101_20251231_005d62N_000d17W_LST_Accra.json",
+        "original_sha256": "f1d4ece6f5b8e6b82d259c763fc209ce08fe08648ac277d7dfd8ba24e3bea4e0",
+        "imported_utc": "2026-11-10T12:55:28+00:00",
+        "location_identified_from": "viewer file name and file coordinates",
+        "file_name_facts": {
+          "location": "Accra",
+          "latitude": 5.62,
+          "longitude": -0.17,
+          "start": "19810101",
+          "end": "20251231",
+          "time_standard": "LST",
+          "format": "json"
+        }
+      },
+      "time_standard": "LST",
+      "header_sources_sorted": [
+        "MERRA2",
+        "POWER",
+        "SRB",
+        "SYN1DEG"
+      ],
+      "elevation_value_in_file_m": 27.76,
+      "location": "Accra",
+      "latitude_in_file_or_config": 5.618,
+      "longitude_in_file_or_config": -0.171,
+      "response_metadata": {
+        "format": "json",
+        "header": {
+          "title": "NASA/POWER Source Native Resolution Monthly and Annual",
+          "api": {
+            "version": "v2.10.0",
+            "name": "POWER Monthly and Annual API"
+          },
+          "sources": [
+            "SYN1DEG",
+            "MERRA2",
+            "SRB",
+            "POWER"
+          ],
+          "fill_value": -999,
+          "time_standard": "LST",
+          "start": "19810101",
+          "end": "20251231"
+        },
+        "parameters": {
+          "ALLSKY_SFC_SW_DWN": {
+            "units": "kW-hr/m^2/day",
+            "longname": "All Sky Surface Shortwave Downward Irradiance"
+          },
+          "PRECTOTCORR": {
+            "units": "mm/day",
+            "longname": "Precipitation Corrected"
+          },
+          "RH2M": {
+            "units": "%",
+            "longname": "Relative Humidity at 2 Meters"
+          },
+          "T2M": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters"
+          },
+          "T2M_MAX": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Maximum"
+          },
+          "T2M_MIN": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Minimum"
+          },
+          "WS10M": {
+            "units": "m/s",
+            "longname": "Wind Speed at 10 Meters"
+          }
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -0.171,
+            5.618,
+            27.76
+          ]
+        },
+        "fill_value": -999,
+        "requested_start": "19810101",
+        "requested_end": "20251231",
+        "resolution_stated_in_response": null
+      },
+      "requested_start": "19810101",
+      "requested_end": "20251231",
+      "actual_coverage": {
+        "ALLSKY_SFC_SW_DWN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1984-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 504,
+          "n_missing_values": 36,
+          "months_absent_inside_span": 0
+        },
+        "PRECTOTCORR": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "RH2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MAX": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MIN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "WS10M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        }
+      }
+    },
+    {
+      "name": "power_monthly_Kumasi_1981_2025.json",
+      "bytes": 61346,
+      "sha256": "d3586c9444caa563274966769b481ef3a5dcd41f0fd0222647d719a259b70cbf",
+      "format": "json",
+      "fetch_record": null,
+      "import_record": {
+        "original_filename": "POWER_Point_Monthly_19810101_20251231_006d70N_001d62W_LST_Kumasi.json",
+        "original_sha256": "d3586c9444caa563274966769b481ef3a5dcd41f0fd0222647d719a259b70cbf",
+        "imported_utc": "2026-11-10T12:55:28+00:00",
+        "location_identified_from": "viewer file name and file coordinates",
+        "file_name_facts": {
+          "location": "Kumasi",
+          "latitude": 6.7,
+          "longitude": -1.62,
+          "start": "19810101",
+          "end": "20251231",
+          "time_standard": "LST",
+          "format": "json"
+        }
+      },
+      "time_standard": "LST",
+      "header_sources_sorted": [
+        "MERRA2",
+        "POWER",
+        "SRB",
+        "SYN1DEG"
+      ],
+      "elevation_value_in_file_m": 221.77,
+      "location": "Kumasi",
+      "latitude_in_file_or_config": 6.695,
+      "longitude_in_file_or_config": -1.616,
+      "response_metadata": {
+        "format": "json",
+        "header": {
+          "title": "NASA/POWER Source Native Resolution Monthly and Annual",
+          "api": {
+            "version": "v2.10.0",
+            "name": "POWER Monthly and Annual API"
+          },
+          "sources": [
+            "SYN1DEG",
+            "SRB",
+            "MERRA2",
+            "POWER"
+          ],
+          "fill_value": -999,
+          "time_standard": "LST",
+          "start": "19810101",
+          "end": "20251231"
+        },
+        "parameters": {
+          "ALLSKY_SFC_SW_DWN": {
+            "units": "kW-hr/m^2/day",
+            "longname": "All Sky Surface Shortwave Downward Irradiance"
+          },
+          "PRECTOTCORR": {
+            "units": "mm/day",
+            "longname": "Precipitation Corrected"
+          },
+          "RH2M": {
+            "units": "%",
+            "longname": "Relative Humidity at 2 Meters"
+          },
+          "T2M": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters"
+          },
+          "T2M_MAX": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Maximum"
+          },
+          "T2M_MIN": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Minimum"
+          },
+          "WS10M": {
+            "units": "m/s",
+            "longname": "Wind Speed at 10 Meters"
+          }
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -1.616,
+            6.695,
+            221.77
+          ]
+        },
+        "fill_value": -999,
+        "requested_start": "19810101",
+        "requested_end": "20251231",
+        "resolution_stated_in_response": null
+      },
+      "requested_start": "19810101",
+      "requested_end": "20251231",
+      "actual_coverage": {
+        "ALLSKY_SFC_SW_DWN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1984-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 504,
+          "n_missing_values": 36,
+          "months_absent_inside_span": 0
+        },
+        "PRECTOTCORR": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "RH2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MAX": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MIN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "WS10M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        }
+      }
+    },
+    {
+      "name": "power_monthly_Takoradi_1981_2025.json",
+      "bytes": 61330,
+      "sha256": "cb4d3ccb3702e113bd37e52a84887321c9a285b16831c7009e08aecfc4098127",
+      "format": "json",
+      "fetch_record": null,
+      "import_record": {
+        "original_filename": "POWER_Point_Monthly_19810101_20251231_004d90N_001d76W_LST_Takoradi.json",
+        "original_sha256": "cb4d3ccb3702e113bd37e52a84887321c9a285b16831c7009e08aecfc4098127",
+        "imported_utc": "2026-11-10T12:55:28+00:00",
+        "location_identified_from": "viewer file name and file coordinates",
+        "file_name_facts": {
+          "location": "Takoradi",
+          "latitude": 4.9,
+          "longitude": -1.76,
+          "start": "19810101",
+          "end": "20251231",
+          "time_standard": "LST",
+          "format": "json"
+        }
+      },
+      "time_standard": "LST",
+      "header_sources_sorted": [
+        "MERRA2",
+        "POWER",
+        "SRB",
+        "SYN1DEG"
+      ],
+      "elevation_value_in_file_m": 48.97,
+      "location": "Takoradi",
+      "latitude_in_file_or_config": 4.9,
+      "longitude_in_file_or_config": -1.76,
+      "response_metadata": {
+        "format": "json",
+        "header": {
+          "title": "NASA/POWER Source Native Resolution Monthly and Annual",
+          "api": {
+            "version": "v2.10.0",
+            "name": "POWER Monthly and Annual API"
+          },
+          "sources": [
+            "SRB",
+            "SYN1DEG",
+            "MERRA2",
+            "POWER"
+          ],
+          "fill_value": -999,
+          "time_standard": "LST",
+          "start": "19810101",
+          "end": "20251231"
+        },
+        "parameters": {
+          "ALLSKY_SFC_SW_DWN": {
+            "units": "kW-hr/m^2/day",
+            "longname": "All Sky Surface Shortwave Downward Irradiance"
+          },
+          "PRECTOTCORR": {
+            "units": "mm/day",
+            "longname": "Precipitation Corrected"
+          },
+          "RH2M": {
+            "units": "%",
+            "longname": "Relative Humidity at 2 Meters"
+          },
+          "T2M": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters"
+          },
+          "T2M_MAX": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Maximum"
+          },
+          "T2M_MIN": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Minimum"
+          },
+          "WS10M": {
+            "units": "m/s",
+            "longname": "Wind Speed at 10 Meters"
+          }
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -1.76,
+            4.9,
+            48.97
+          ]
+        },
+        "fill_value": -999,
+        "requested_start": "19810101",
+        "requested_end": "20251231",
+        "resolution_stated_in_response": null
+      },
+      "requested_start": "19810101",
+      "requested_end": "20251231",
+      "actual_coverage": {
+        "ALLSKY_SFC_SW_DWN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1984-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 504,
+          "n_missing_values": 36,
+          "months_absent_inside_span": 0
+        },
+        "PRECTOTCORR": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "RH2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MAX": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MIN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "WS10M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        }
+      }
+    },
+    {
+      "name": "power_monthly_Tamale_1981_2025.json",
+      "bytes": 61238,
+      "sha256": "e8f43dfa758a3bd64e5079d1b4473cda32bcc56768aa76d0af2b30fe467e4788",
+      "format": "json",
+      "fetch_record": null,
+      "import_record": {
+        "original_filename": "POWER_Point_Monthly_19810101_20251231_009d41N_000d84W_LST_Tamale.json",
+        "original_sha256": "e8f43dfa758a3bd64e5079d1b4473cda32bcc56768aa76d0af2b30fe467e4788",
+        "imported_utc": "2026-11-10T12:55:28+00:00",
+        "location_identified_from": "viewer file name and file coordinates",
+        "file_name_facts": {
+          "location": "Tamale",
+          "latitude": 9.41,
+          "longitude": -0.84,
+          "start": "19810101",
+          "end": "20251231",
+          "time_standard": "LST",
+          "format": "json"
+        }
+      },
+      "time_standard": "LST",
+      "header_sources_sorted": [
+        "MERRA2",
+        "POWER",
+        "SRB",
+        "SYN1DEG"
+      ],
+      "elevation_value_in_file_m": 157.7,
+      "location": "Tamale",
+      "latitude_in_file_or_config": 9.408,
+      "longitude_in_file_or_config": -0.843,
+      "response_metadata": {
+        "format": "json",
+        "header": {
+          "title": "NASA/POWER Source Native Resolution Monthly and Annual",
+          "api": {
+            "version": "v2.10.0",
+            "name": "POWER Monthly and Annual API"
+          },
+          "sources": [
+            "SYN1DEG",
+            "SRB",
+            "MERRA2",
+            "POWER"
+          ],
+          "fill_value": -999,
+          "time_standard": "LST",
+          "start": "19810101",
+          "end": "20251231"
+        },
+        "parameters": {
+          "ALLSKY_SFC_SW_DWN": {
+            "units": "kW-hr/m^2/day",
+            "longname": "All Sky Surface Shortwave Downward Irradiance"
+          },
+          "PRECTOTCORR": {
+            "units": "mm/day",
+            "longname": "Precipitation Corrected"
+          },
+          "RH2M": {
+            "units": "%",
+            "longname": "Relative Humidity at 2 Meters"
+          },
+          "T2M": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters"
+          },
+          "T2M_MAX": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Maximum"
+          },
+          "T2M_MIN": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Minimum"
+          },
+          "WS10M": {
+            "units": "m/s",
+            "longname": "Wind Speed at 10 Meters"
+          }
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -0.843,
+            9.408,
+            157.7
+          ]
+        },
+        "fill_value": -999,
+        "requested_start": "19810101",
+        "requested_end": "20251231",
+        "resolution_stated_in_response": null
+      },
+      "requested_start": "19810101",
+      "requested_end": "20251231",
+      "actual_coverage": {
+        "ALLSKY_SFC_SW_DWN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1984-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 504,
+          "n_missing_values": 36,
+          "months_absent_inside_span": 0
+        },
+        "PRECTOTCORR": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "RH2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MAX": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MIN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "WS10M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        }
+      }
+    },
+    {
+      "name": "power_monthly_Wa_1981_2025.json",
+      "bytes": 61170,
+      "sha256": "c847293d3d868cc3d1e7a954832199b0e2ab705df66440e14a5176128540f28d",
+      "format": "json",
+      "fetch_record": null,
+      "import_record": {
+        "original_filename": "POWER_Point_Monthly_19810101_20251231_010d06N_002d50W_LST_Wa.json",
+        "original_sha256": "c847293d3d868cc3d1e7a954832199b0e2ab705df66440e14a5176128540f28d",
+        "imported_utc": "2026-11-10T12:55:28+00:00",
+        "location_identified_from": "viewer file name and file coordinates",
+        "file_name_facts": {
+          "location": "Wa",
+          "latitude": 10.06,
+          "longitude": -2.5,
+          "start": "19810101",
+          "end": "20251231",
+          "time_standard": "LST",
+          "format": "json"
+        }
+      },
+      "time_standard": "LST",
+      "header_sources_sorted": [
+        "MERRA2",
+        "POWER",
+        "SRB",
+        "SYN1DEG"
+      ],
+      "elevation_value_in_file_m": 283.01,
+      "location": "Wa",
+      "latitude_in_file_or_config": 10.063,
+      "longitude_in_file_or_config": -2.503,
+      "response_metadata": {
+        "format": "json",
+        "header": {
+          "title": "NASA/POWER Source Native Resolution Monthly and Annual",
+          "api": {
+            "version": "v2.10.0",
+            "name": "POWER Monthly and Annual API"
+          },
+          "sources": [
+            "SRB",
+            "SYN1DEG",
+            "MERRA2",
+            "POWER"
+          ],
+          "fill_value": -999,
+          "time_standard": "LST",
+          "start": "19810101",
+          "end": "20251231"
+        },
+        "parameters": {
+          "ALLSKY_SFC_SW_DWN": {
+            "units": "kW-hr/m^2/day",
+            "longname": "All Sky Surface Shortwave Downward Irradiance"
+          },
+          "PRECTOTCORR": {
+            "units": "mm/day",
+            "longname": "Precipitation Corrected"
+          },
+          "RH2M": {
+            "units": "%",
+            "longname": "Relative Humidity at 2 Meters"
+          },
+          "T2M": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters"
+          },
+          "T2M_MAX": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Maximum"
+          },
+          "T2M_MIN": {
+            "units": "C",
+            "longname": "Temperature at 2 Meters Minimum"
+          },
+          "WS10M": {
+            "units": "m/s",
+            "longname": "Wind Speed at 10 Meters"
+          }
+        },
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -2.503,
+            10.063,
+            283.01
+          ]
+        },
+        "fill_value": -999,
+        "requested_start": "19810101",
+        "requested_end": "20251231",
+        "resolution_stated_in_response": null
+      },
+      "requested_start": "19810101",
+      "requested_end": "20251231",
+      "actual_coverage": {
+        "ALLSKY_SFC_SW_DWN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1984-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 504,
+          "n_missing_values": 36,
+          "months_absent_inside_span": 0
+        },
+        "PRECTOTCORR": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "RH2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MAX": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "T2M_MIN": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        },
+        "WS10M": {
+          "first_month_present": "1981-01-01",
+          "last_month_present": "2025-12-01",
+          "first_valid_month": "1981-01-01",
+          "last_valid_month": "2025-12-01",
+          "n_months_present": 540,
+          "n_valid": 540,
+          "n_missing_values": 0,
+          "months_absent_inside_span": 0
+        }
+      }
+    }
+  ],
+  "variables": {
+    "ALLSKY_SFC_SW_DWN": {
+      "unit": "kW-hr/m^2/day",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_mean_of_daily_total",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "all_sky_surface_shortwave_downward_irradiance",
+      "response_parameter_metadata_verbatim": {
+        "units": "kW-hr/m^2/day",
+        "longname": "All Sky Surface Shortwave Downward Irradiance"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    },
+    "PRECTOTCORR": {
+      "unit": "mm/day",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_mean_of_daily_precipitation_rate_not_a_monthly_total",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "precipitation",
+      "response_parameter_metadata_verbatim": {
+        "units": "mm/day",
+        "longname": "Precipitation Corrected"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    },
+    "RH2M": {
+      "unit": "%",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_mean_of_daily_mean",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "relative_humidity_2m",
+      "response_parameter_metadata_verbatim": {
+        "units": "%",
+        "longname": "Relative Humidity at 2 Meters"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    },
+    "T2M": {
+      "unit": "C",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_mean_of_daily_mean",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "air_temperature_2m",
+      "response_parameter_metadata_verbatim": {
+        "units": "C",
+        "longname": "Temperature at 2 Meters"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    },
+    "T2M_MAX": {
+      "unit": "C",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_maximum_of_hourly_values",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "air_temperature_2m",
+      "response_parameter_metadata_verbatim": {
+        "units": "C",
+        "longname": "Temperature at 2 Meters Maximum"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    },
+    "T2M_MIN": {
+      "unit": "C",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_minimum_of_hourly_values",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "air_temperature_2m",
+      "response_parameter_metadata_verbatim": {
+        "units": "C",
+        "longname": "Temperature at 2 Meters Minimum"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    },
+    "WS10M": {
+      "unit": "m/s",
+      "unit_source": [
+        "response_metadata"
+      ],
+      "statistic": "monthly_mean_of_daily_mean",
+      "semantics_status": "nasa_documented_and_consistent_with_returned_data",
+      "quantity": "wind_speed_10m",
+      "response_parameter_metadata_verbatim": {
+        "units": "m/s",
+        "longname": "Wind Speed at 10 Meters"
+      },
+      "spatial_resolution": "not stated in the response; not verified"
+    }
+  },
+  "sources": [
+    "NASA POWER"
+  ],
+  "data_kind": [
+    "gridded_estimate_not_station_observation"
+  ],
+  "temporal_resolution": "monthly",
+  "community": "AG",
+  "duplicates_removed": 0,
+  "assumed_documented_units_used": false,
+  "rows": 18900,
+  "note": "POWER values are model based estimates, not direct station observations."
+}
