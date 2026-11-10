@@ -16,14 +16,40 @@ st.set_page_config(page_title="EarthScope | Environmental intelligence", page_ic
 
 st.markdown("""
 <style>
-.stApp{background:#F7F8F6}.block-container{padding-top:2rem;max-width:1450px}
+.stApp{background:#F7F8F6}.block-container{padding:2rem 2rem 3rem;max-width:1450px}
 [data-testid="stSidebar"]{background:#EEF3F1}
-[data-testid="stMetric"]{background:white;border:1px solid #E2EAE6;padding:14px;border-radius:13px}
+[data-testid="stMetric"]{background:white;border:1px solid #E2EAE6;padding:14px;border-radius:13px;min-width:0}
 .hero{background:linear-gradient(115deg,#102F40,#176E73);color:white;padding:30px 34px;border-radius:18px;margin-bottom:22px}
 .hero h1{color:white;font-size:2.4rem;margin:0 0 6px}.hero p{color:#D7EAE7;margin:0;font-size:1.05rem}
 .eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#A8DCD0;font-size:.72rem;font-weight:700;margin-bottom:8px}
 .note{background:#EAF3F0;border-left:4px solid #238B83;padding:12px 16px;border-radius:7px;margin:8px 0 18px}
 div[data-testid="stTabs"] button[aria-selected="true"]{color:#147C78}
+div[data-testid="stPlotlyChart"]{width:100%;min-width:0}
+[data-testid="stDataFrame"]{max-width:100%;overflow-x:auto}
+@media (max-width: 768px){
+ .block-container{padding:.85rem .8rem 2rem}
+ .hero{padding:22px 18px;border-radius:14px;margin-bottom:16px}
+ .hero h1{font-size:1.85rem;line-height:1.12}
+ .hero p{font-size:.94rem;line-height:1.45}
+ .eyebrow{font-size:.62rem;letter-spacing:.09em}
+ h2{font-size:1.25rem!important} h3{font-size:1.08rem!important}
+ [data-testid="stHorizontalBlock"]{flex-wrap:wrap;gap:.55rem}
+ [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 calc(50% - .55rem)!important;min-width:calc(50% - .55rem)!important}
+ [data-testid="stMetric"]{padding:10px;border-radius:10px}
+ [data-testid="stMetricLabel"]{font-size:.72rem}
+ [data-testid="stMetricValue"]{font-size:1.25rem}
+ div[data-testid="stTabs"]>div{overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+ div[data-testid="stTabs"] button{font-size:.76rem;padding:.45rem .65rem;min-width:max-content}
+ div[data-testid="stPlotlyChart"]{margin-left:-.25rem;margin-right:-.25rem}
+ [data-testid="stDataFrame"]{font-size:.78rem}
+ .note{font-size:.88rem;line-height:1.5;padding:10px 12px}
+}
+@media (max-width: 390px){
+ .block-container{padding-left:.55rem;padding-right:.55rem}
+ .hero h1{font-size:1.65rem}
+ [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex-basis:100%!important;min-width:100%!important}
+ div[data-testid="stTabs"] button{font-size:.7rem;padding:.4rem .5rem}
+}
 </style>
 """, unsafe_allow_html=True)
 
