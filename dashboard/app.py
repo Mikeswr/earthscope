@@ -371,8 +371,8 @@ with owtab:
                 timestamp_payload, timestamp_sample, timestamp_requested = fetch_openweather_timestamp_probe(
                     row["latitude"], row["longitude"]
                 )
-            if timestamp_payload.get("dt") and not timestamp_sample.empty:
-                returned_at = pd.to_datetime(timestamp_payload["dt"], unit="s", utc=True)
+            if timestamp_payload.get("data") and not timestamp_sample.empty:
+                returned_at = pd.to_datetime(timestamp_payload["data"][0]["dt"], unit="s", utc=True)
                 st.success(f"Timestamp history access confirmed for {loc}.")
                 st.caption(f"Requested: {timestamp_requested:%Y-%m-%d %H:%M} UTC · Returned: {returned_at:%Y-%m-%d %H:%M} UTC.")
                 st.dataframe(timestamp_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")

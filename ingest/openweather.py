@@ -21,7 +21,7 @@ VERIFIED_AGAINST_LIVE_API = False
 CURRENT = "https://api.openweathermap.org/data/2.5/weather"
 ONECALL = "https://api.openweathermap.org/data/3.0/onecall"
 HISTORY = "https://history.openweathermap.org/data/2.5/history/city"
-HISTORY_TIMESTAMP = "https://history.openweathermap.org/data/3.0/history/timemachine"
+HISTORY_TIMESTAMP = "https://api.openweathermap.org/data/3.0/onecall/timemachine"
 KIND = "blended_measured_and_model_unverified"
 
 
@@ -47,27 +47,29 @@ def history_hourly(lat, lon, start_unix, end_unix, units="metric", **kw):
 def history_timestamp(lat, lon, dt_unix, **kw):
     """Retrieve one historical observation using OpenWeather Timestamp History API."""
     return http.call("GET", HISTORY_TIMESTAMP, secret=_key(), params={
-        "lat": lat, "lon": lon, "dt": int(dt_unix)}, **kw)[1]
+        "lat": lat, "lon": lon, "dt": int(dt_unix), "units": "metric"}, **kw)[1]
 
 
 def parse_history_timestamp(payload, location, lat, lon):
-    """Parse one Timestamp History API observation; source temperatures are Kelvin."""
-    if not isinstance(payload, dict) or not payload.get("dt"):
-        raise ValueError("timestamp history response has no valid 'dt' field")
-    ts = pd.to_datetime(payload["dt"], unit="s", utc=True).tz_localize(None)
-    temp_k = _dig(payload, ("main", "temp"))
+    """Parse One Call 3.0 timestamp history response; metric temperature is Celsius."""
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list) or not data or not data[0].get("dt"):
+        raise ValueError("timestamp history response has no valid data observation")
+    e = data[0]
+    ts = pd.to_datetime(e["dt"], unit="s", utc=True).tz_localize(None)
     items = [
-        ("temp", float(temp_k) - 273.15 if temp_k is not None else None, "C", "hourly_instantaneous"),
-        ("pressure", _dig(payload, ("main", "pressure")), "hPa", "hourly_instantaneous"),
-        ("humidity", _dig(payload, ("main", "humidity")), "%", "hourly_instantaneous"),
-        ("wind_speed", _dig(payload, ("wind", "speed")), "m/s", "hourly_instantaneous"),
-        ("cloud_cover", _dig(payload, ("clouds", "all")), "%", "hourly_instantaneous"),
-        ("rain_1h", _dig(payload, ("rain", "1h")), "mm", "hourly_accumulation"),
+        ("temp", _dig(e, ("temp",)), "C", "hourly_instantaneous"),
+        ("feels_like", _dig(e, ("feels_like",)), "C", "hourly_instantaneous"),
+        ("pressure", _dig(e, ("pressure",)), "hPa", "hourly_instantaneous"),
+        ("humidity", _dig(e, ("humidity",)), "%", "hourly_instantaneous"),
+        ("wind_speed", _dig(e, ("wind_speed",)), "m/s", "hourly_instantaneous"),
+        ("cloud_cover", _dig(e, ("clouds",)), "%", "hourly_instantaneous"),
+        ("visibility", _dig(e, ("visibility",)), "m", "hourly_instantaneous"),
+        ("rain_1h", _dig(e, ("rain", "1h")), "mm", "hourly_accumulation"),
     ]
-    rows = _rows(ts, items, location, lat, lon, "OpenWeather Timestamp History API",
-                 "timestamp_observation", "documented_kelvin_to_celsius")
+    rows = _rows(ts, items, location, lat, lon, "OpenWeather One Call 3.0 Timestamp History API",
+                 "timestamp_observation", "response_units_metric")
     return pd.DataFrame(rows, columns=STANDARD_COLUMNS)
-
 
 def _rows(date, items, location, lat, lon, source, statistic_default, unit_source):
     rows = []
