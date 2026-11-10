@@ -71,6 +71,79 @@ div[data-testid="stPlotlyChart"]{width:100%;min-width:0}
  [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex-basis:100%!important;min-width:100%!important}
  div[data-testid="stTabs"] button{font-size:.7rem;padding:.4rem .5rem}
 }
+
+/* Strong, consistent contrast for Streamlit's rendered text and controls */
+.stApp, .stApp [data-testid="stMarkdownContainer"],
+.stApp [data-testid="stMarkdownContainer"] p,
+.stApp [data-testid="stMarkdownContainer"] li,
+.stApp [data-testid="stWidgetLabel"],
+.stApp [data-testid="stCaptionContainer"],
+.stApp [data-testid="stText"],
+.stApp label,
+.stApp small,
+.stApp .stRadio,
+.stApp .stCheckbox,
+.stApp [data-testid="stMetricLabel"],
+.stApp [data-testid="stMetricDelta"] {
+  color: #203744 !important;
+  opacity: 1 !important;
+}
+.stApp [data-testid="stCaptionContainer"],
+.stApp .stCaption,
+.stApp small {
+  color: #425B68 !important;
+}
+.stApp [data-testid="stMetricValue"] {
+  color: #173344 !important;
+  opacity: 1 !important;
+}
+/* Keep every part of the branded hero readable, including the EarthScope title */
+.stApp .hero,
+.stApp .hero * {
+  opacity: 1 !important;
+}
+.stApp .hero h1,
+.stApp .hero h1 span,
+.stApp .hero h1 p,
+.stApp .hero h1 strong {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,.18);
+}
+.stApp .hero p {
+  color: #F0F8F6 !important;
+  -webkit-text-fill-color: #F0F8F6 !important;
+}
+.stApp .hero .eyebrow {
+  color: #C5F0E5 !important;
+  -webkit-text-fill-color: #C5F0E5 !important;
+}
+.stApp [data-testid="stTabs"] button,
+.stApp [data-testid="stTabs"] button p {
+  color: #294653 !important;
+  opacity: 1 !important;
+}
+.stApp [data-testid="stTabs"] button[aria-selected="true"],
+.stApp [data-testid="stTabs"] button[aria-selected="true"] p {
+  color: #08766F !important;
+  opacity: 1 !important;
+}
+.stApp [data-testid="stSidebar"] *,
+.stApp [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] * {
+  opacity: 1 !important;
+}
+.stApp [data-baseweb="select"] *,
+.stApp [data-baseweb="input"] *,
+.stApp textarea {
+  color: #203744 !important;
+  opacity: 1 !important;
+}
+.stApp [data-testid="stAlert"] *,
+.stApp [data-testid="stDataFrame"] * {
+  opacity: 1 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
