@@ -178,6 +178,17 @@ def fetch_openweather_history_probe(lat, lon):
     parsed = owm.parse_history_hourly(payload, "Selected location", float(lat), float(lon))
     return payload, parsed, start, end
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_openweather_archive_probe(lat, lon):
+    """Test whether the account can retrieve a historical date well before the recent window."""
+    start = pd.Timestamp("2020-01-15 00:00:00", tz="UTC")
+    end = start + pd.Timedelta(hours=24)
+    payload = owm.history_hourly(
+        float(lat), float(lon), int(start.timestamp()), int(end.timestamp()), units="metric"
+    )
+    parsed = owm.parse_history_hourly(payload, "Selected location", float(lat), float(lon))
+    return payload, parsed, start, end
+
 data=load_data()
 if data is None:
     st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation</div><h1>EarthScope</h1><p>Understand how environmental conditions change across time and place.</p></div>',unsafe_allow_html=True)
@@ -341,6 +352,27 @@ with owtab:
             st.warning(f"Historical access was not confirmed. HTTP status: {e.status}. {e.hint or 'Check the account subscription and endpoint permissions.'}")
         except (KeyError, TypeError, ValueError) as e:
             st.warning(f"The endpoint response did not pass the parser check: {e}")
+
+    st.markdown("### Test access to an older archive date")
+    st.write("The first test confirms recent hourly history. This second test requests 24 hours from 15 January 2020 to establish whether the same endpoint can retrieve older archive records.")
+    if st.button("Test historical archive (January 2020)", key="test_openweather_archive"):
+        try:
+            with st.spinner("Checking historical archive access..."):
+                archive_payload, archive_sample, archive_start, archive_end = fetch_openweather_archive_probe(
+                    row["latitude"], row["longitude"]
+                )
+            archive_records = archive_payload.get("list", [])
+            if archive_records and not archive_sample.empty:
+                st.success(f"Older archive access confirmed. Returned {len(archive_records)} hourly records for {loc}.")
+                st.caption(f"Requested UTC window: {archive_start:%Y-%m-%d %H:%M} to {archive_end:%Y-%m-%d %H:%M}.")
+                st.write("Variables returned:", ", ".join(sorted(archive_sample["variable"].unique())))
+                st.dataframe(archive_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")
+            else:
+                st.warning("The request returned no usable hourly observations for January 2020. Recent history works, but older archive access is not yet confirmed.")
+        except api_http.ApiError as e:
+            st.warning(f"Older archive access was not confirmed. HTTP status: {e.status}. {e.hint or 'The account may have a limited historical window.'}")
+        except (KeyError, TypeError, ValueError) as e:
+            st.warning(f"The older archive response did not pass the parser check: {e}")
 
     with st.expander("How this source is used"):
         st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. Historical OpenWeather data will only be added after the endpoint entitlement and live response structure are verified.")
