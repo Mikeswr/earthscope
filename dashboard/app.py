@@ -12,6 +12,7 @@ from earthscope.qc import checks
 from earthscope.spatial.grid import point_trend_map
 from earthscope.trends.pipeline import annual_series, monthly_series
 from earthscope.ingest import openweather as owm
+from earthscope.ingest import agromonitoring as agro
 from earthscope.ingest import http as api_http
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
@@ -178,58 +179,19 @@ def fetch_openweather_history_probe(lat, lon):
     parsed = owm.parse_history_hourly(payload, "Selected location", float(lat), float(lon))
     return payload, parsed, start, end
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_openweather_timestamp_probe(lat, lon):
-    """Test one timestamp from January 2020 using the separate Timestamp History API."""
-    timestamp = pd.Timestamp("2020-01-15 12:00:00", tz="UTC")
-    # Call the endpoint directly here so this probe does not depend on a cached
-    # imported module version during Streamlit Cloud hot-reloads.
-    payload = api_http.call(
-        "GET",
-        "https://api.openweathermap.org/data/3.0/onecall/timemachine",
-        secret=config.get_key(config.ENV_OPENWEATHER),
-        params={"lat": float(lat), "lon": float(lon), "dt": int(timestamp.timestamp()), "units": "metric"},
-    )[1]
-    observations = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(observations, list) or not observations or not observations[0].get("dt"):
-        raise ValueError("Timestamp History response has no valid data observation.")
-    obs = observations[0]
-    observed = pd.to_datetime(obs["dt"], unit="s", utc=True).tz_localize(None)
-    fields = [
-        ("temp", obs.get("temp"), "C", "hourly_instantaneous"),
-        ("feels_like", obs.get("feels_like"), "C", "hourly_instantaneous"),
-        ("pressure", obs.get("pressure"), "hPa", "hourly_instantaneous"),
-        ("humidity", obs.get("humidity"), "%", "hourly_instantaneous"),
-        ("wind_speed", obs.get("wind_speed"), "m/s", "hourly_instantaneous"),
-        ("cloud_cover", obs.get("clouds"), "%", "hourly_instantaneous"),
-        ("visibility", obs.get("visibility"), "m", "hourly_instantaneous"),
-        ("rain_1h", (obs.get("rain") or {}).get("1h"), "mm", "hourly_accumulation"),
-    ]
-    rows = [
-        {"location": "Selected location", "latitude": float(lat), "longitude": float(lon),
-         "date": observed, "variable": variable, "value": float(value), "unit": unit,
-         "unit_source": "response_units_metric", "statistic": statistic,
-         "source": "OpenWeather One Call 3.0 Timestamp History API",
-         "data_kind": "blended_measured_and_model_unverified"}
-        for variable, value, unit, statistic in fields if value is not None
-    ]
-    parsed = pd.DataFrame(rows, columns=[
-        "location", "latitude", "longitude", "date", "variable", "value", "unit",
-        "unit_source", "statistic", "source", "data_kind"
-    ])
-    return payload, parsed, timestamp
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_agromonitoring_current(lat, lon):
+    return agro.current_weather(float(lat), float(lon))
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_openweather_archive_probe(lat, lon):
-    """Test whether the account can retrieve a historical date well before the recent window."""
-    start = pd.Timestamp("2020-01-15 00:00:00", tz="UTC")
-    end = start + pd.Timedelta(hours=24)
-    payload = owm.history_hourly(
-        float(lat), float(lon), int(start.timestamp()), int(end.timestamp()), units="metric"
-    )
-    parsed = owm.parse_history_hourly(payload, "Selected location", float(lat), float(lon))
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_agromonitoring_history(lat, lon):
+    end = pd.Timestamp.now(tz="UTC").floor("h")
+    start = end - pd.Timedelta(hours=23)
+    payload = agro.weather_history(float(lat), float(lon), int(start.timestamp()), int(end.timestamp()))
+    parsed = agro.parse_weather_history(payload, "Selected location", float(lat), float(lon))
     return payload, parsed, start, end
+
 
 data=load_data()
 if data is None:
@@ -268,7 +230,7 @@ c.metric("Estimated change per decade",f"{number(row['sen_per_decade'])} {unit}"
 d.metric("FDR-adjusted p-value",number(row["mk_p_fdr"],4),help="Multiple-testing-adjusted statistical evidence, not the probability that a trend is true.")
 st.caption("NASA POWER historical monthly data. These are gridded estimates, not direct weather-station observations.")
 
-ts,tr,an,mp,qc,about,owtab=st.tabs(["Explore time series","Compare trends","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now"])
+ts,tr,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -338,21 +300,19 @@ with about:
 
 
 
+
 with owtab:
-    st.markdown("### Current weather conditions")
-    st.write("A separate, recent snapshot from OpenWeather for the selected location. This is not part of the NASA POWER historical trend analysis.")
+    st.markdown("### OpenWeather nowcast")
+    st.write("Live conditions plus an interactive view of the latest four hourly observations. The four-hour series is recent weather history, not a forecast.")
     if not config.get_key(config.ENV_OPENWEATHER):
-        st.info('OpenWeather is not connected yet. In Streamlit Community Cloud, open the app settings, go to Secrets, and add OPENWEATHER_API_KEY = "your_api_key". Keep the key private. The dashboard will use it automatically after the app restarts.')
+        st.info('Add OPENWEATHER_API_KEY to Streamlit Cloud Secrets to enable OpenWeather.')
     else:
-        if "ow_current_requested" not in st.session_state:
-            st.session_state["ow_current_requested"] = False
-        if st.button("Load or refresh current conditions", key="load_openweather_current"):
+        if st.button("Refresh current conditions", key="load_openweather_current"):
             st.session_state["ow_current_requested"] = True
-        if st.session_state["ow_current_requested"]:
+        if st.session_state.get("ow_current_requested", False):
             try:
                 ow = fetch_openweather_current(row["latitude"], row["longitude"])
-                main = ow["main"]
-                wind = ow.get("wind", {})
+                main, wind = ow["main"], ow.get("wind", {})
                 weather_items = ow.get("weather") or []
                 condition = weather_items[0].get("description", "Conditions not described") if weather_items else "Conditions not described"
                 st.markdown(f"**{loc}** · {condition.title()}")
@@ -361,85 +321,116 @@ with owtab:
                 w2.metric("Feels like", f"{number(main.get('feels_like'), 1)} °C")
                 w3.metric("Relative humidity", f"{number(main.get('humidity'), 0)} %")
                 w4.metric("Wind speed", f"{number(wind.get('speed'), 1)} m/s")
-                x1, x2, x3 = st.columns(3)
-                x1.metric("Air pressure", f"{number(main.get('pressure'), 0)} hPa")
-                x2.metric("Cloud cover", f"{number(ow.get('clouds', {}).get('all'), 0)} %")
-                x3.metric("Visibility", f"{number(ow.get('visibility') / 1000, 1)} km" if ow.get("visibility") is not None else "Not available")
                 offset = int(ow.get("timezone", 0) or 0)
                 observed_at = pd.to_datetime(ow["dt"], unit="s", utc=True) + pd.to_timedelta(offset, unit="s")
-                st.caption(f"OpenWeather Current Weather API · API timestamp: {observed_at.strftime('%Y-%m-%d %H:%M')} local time · Cached for up to 10 minutes.")
-                st.caption("OpenWeather current conditions can combine multiple data inputs. They are shown as a recent snapshot, not as a station observation or a climate trend.")
+                st.caption(f"OpenWeather current conditions · {observed_at:%Y-%m-%d %H:%M} local time · Cached for up to 10 minutes.")
             except api_http.ApiError as e:
-                st.warning(f"OpenWeather could not return data for this location. HTTP status: {e.status}. {e.hint or 'Check the API key and endpoint access.'}")
-            except (KeyError, TypeError, ValueError, ZeroDivisionError):
-                st.warning("OpenWeather returned a response that did not match the expected structure. The NASA POWER analysis remains available.")
+                st.warning(f"OpenWeather request failed: {str(e)}")
+            except (KeyError, TypeError, ValueError) as e:
+                st.warning(f"OpenWeather response could not be read: {e}")
 
-    st.markdown("### Check historical data access")
-    st.write("This makes a small request for the most recent three completed hours. It checks whether the API key can access OpenWeather's hourly History API and whether the response contains usable observations. It does not download a long archive or alter the NASA dataset.")
-    if st.button("Test historical API access", key="test_openweather_history"):
-        try:
-            with st.spinner("Checking OpenWeather historical access..."):
-                payload, history_sample, start, end = fetch_openweather_history_probe(
-                    row["latitude"], row["longitude"]
-                )
-            records = payload.get("list", [])
-            if len(records) and not history_sample.empty:
-                st.success(f"Historical access confirmed. OpenWeather returned {len(records)} hourly records for {loc}.")
-                st.caption(f"Requested UTC window: {start:%Y-%m-%d %H:%M} to {end:%Y-%m-%d %H:%M}.")
-                st.write("Variables returned:", ", ".join(sorted(history_sample["variable"].unique())))
-                st.dataframe(history_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")
-            else:
-                st.warning("The endpoint responded, but the sample contained no usable hourly observations. We should inspect the response before building ingestion.")
-        except api_http.ApiError as e:
-            st.warning(f"Historical access was not confirmed. HTTP status: {e.status}. {e.hint or 'Check the account subscription and endpoint permissions.'}")
-        except (KeyError, TypeError, ValueError) as e:
-            st.warning(f"The endpoint response did not pass the parser check: {e}")
+        st.markdown("### Latest four hours")
+        st.write("Select a variable to inspect its hourly movement. The endpoint has already returned four hourly records for Accra in the live access test.")
+        if st.button("Load latest four hours", key="load_openweather_4h"):
+            st.session_state["ow_history_requested"] = True
+        if st.session_state.get("ow_history_requested", False):
+            try:
+                payload, history_sample, start, end = fetch_openweather_history_probe(row["latitude"], row["longitude"])
+                if not history_sample.empty:
+                    variables = sorted(history_sample["variable"].unique())
+                    labels = {
+                        "temp": ("Air temperature", "°C"),
+                        "humidity": ("Relative humidity", "%"),
+                        "pressure": ("Air pressure", "hPa"),
+                        "wind_speed": ("Wind speed", "m/s"),
+                        "cloud_cover": ("Cloud cover", "%"),
+                        "rain_1h": ("Rainfall in previous hour", "mm"),
+                    }
+                    selected = st.selectbox("Plot variable", variables, format_func=lambda v: f"{labels.get(v, (v, ''))[0]} ({labels.get(v, ('', ''))[1]})", key="ow_4h_variable")
+                    series = history_sample[history_sample["variable"] == selected].sort_values("date")
+                    title, unit_label = labels.get(selected, (selected, series["unit"].iloc[0]))
+                    fig4 = go.Figure()
+                    fig4.add_trace(go.Scatter(
+                        x=series["date"], y=series["value"], mode="lines+markers",
+                        name=title, line=dict(width=3), marker=dict(size=8),
+                        hovertemplate="%{x|%H:%M UTC}<br>%{y:.2f} " + unit_label + "<extra></extra>"
+                    ))
+                    fig4.update_layout(
+                        title=f"{title} over the latest four hourly observations",
+                        xaxis_title="Time (UTC)", yaxis_title=unit_label, height=390,
+                        hovermode="x unified", plot_bgcolor="white", paper_bgcolor="white"
+                    )
+                    st.plotly_chart(fig4, width="stretch")
+                    latest = series.iloc[-1]
+                    st.metric(f"Latest {title.lower()}", f"{number(latest['value'], 2)} {unit_label}")
+                    st.caption(f"Retrieved {len(payload.get('list', []))} hourly records from {start:%Y-%m-%d %H:%M} to {end:%Y-%m-%d %H:%M} UTC. This is an observed/recent-history series, not a forecast.")
+                    st.dataframe(series[["date", "value", "unit"]], hide_index=True, width="stretch")
+                else:
+                    st.warning("The API returned no usable hourly observations for this time window.")
+            except api_http.ApiError as e:
+                st.warning(f"Recent hourly data could not be retrieved: {str(e)}")
+            except (KeyError, TypeError, ValueError) as e:
+                st.warning(f"Hourly response could not be parsed: {e}")
 
+    with st.expander("Source and interpretation"):
+        st.markdown("OpenWeather current conditions and recent hourly history are displayed separately from NASA POWER. They are not merged into the long-term trend calculations.")
+        
+with agtab:
+    st.markdown("### Agromonitoring weather")
+    st.write("A second weather source for current conditions and historical hourly data. Historical archive depth depends on the API subscription.")
+    if not config.get_key(config.ENV_AGROMONITORING):
+        st.info('Agromonitoring is not connected yet. Add AGROMONITORING_API_KEY to Streamlit Cloud Secrets. Keep the key private.')
+        st.markdown("Historical weather is documented at a one-hour time step. Access to older periods depends on the subscription.")
+    else:
+        if st.button("Load Agromonitoring current conditions", key="load_agro_current"):
+            st.session_state["agro_current_requested"] = True
+        if st.session_state.get("agro_current_requested", False):
+            try:
+                aw = fetch_agromonitoring_current(row["latitude"], row["longitude"])
+                main, wind = aw.get("main", {}), aw.get("wind", {})
+                weather_items = aw.get("weather") or []
+                condition = weather_items[0].get("description", "Conditions not described") if weather_items else "Conditions not described"
+                st.markdown(f"**{loc}** · {condition.title()}")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Air temperature", f"{number(main.get('temp'), 1)} °C")
+                c2.metric("Feels like", f"{number(main.get('feels_like'), 1)} °C")
+                c3.metric("Relative humidity", f"{number(main.get('humidity'), 0)} %")
+                c4.metric("Wind speed", f"{number(wind.get('speed'), 1)} m/s")
+                st.caption("Agromonitoring current weather API. Current conditions are not a historical observation series.")
+            except api_http.ApiError as e:
+                st.warning(f"Agromonitoring current-weather request failed: {str(e)}")
+            except (KeyError, TypeError, ValueError) as e:
+                st.warning(f"Agromonitoring response could not be read: {e}")
 
-    st.markdown("### Test timestamp history (January 2020)")
-    st.write("This is a separate OpenWeather endpoint. It requests one observation at 12:00 UTC on 15 January 2020. It does not change or merge with the NASA POWER dataset.")
-    if st.button("Test timestamp history (January 2020)", key="test_openweather_timestamp"):
-        try:
-            with st.spinner("Testing the OpenWeather timestamp endpoint..."):
-                timestamp_payload, timestamp_sample, timestamp_requested = fetch_openweather_timestamp_probe(
-                    row["latitude"], row["longitude"]
-                )
-            if timestamp_payload.get("data") and not timestamp_sample.empty:
-                returned_at = pd.to_datetime(timestamp_payload["data"][0]["dt"], unit="s", utc=True)
-                st.success(f"Timestamp history access confirmed for {loc}.")
-                st.caption(f"Requested: {timestamp_requested:%Y-%m-%d %H:%M} UTC · Returned: {returned_at:%Y-%m-%d %H:%M} UTC.")
-                st.dataframe(timestamp_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")
-                st.caption("Temperature was converted from Kelvin to Celsius using the documented Timestamp History response units.")
-            else:
-                st.warning("The endpoint responded, but did not return a valid timestamp observation.")
-        except api_http.ApiError as e:
-            st.warning(f"Timestamp history access was not confirmed. {str(e)}")
-        except (KeyError, TypeError, ValueError) as e:
-            st.warning(f"The timestamp response did not pass validation: {e}")
-
-    st.markdown("### Test access to an older archive date")
-    st.write("The first test confirms recent hourly history. This second test requests 24 hours from 15 January 2020 to establish whether the same endpoint can retrieve older archive records.")
-    if st.button("Test historical archive (January 2020)", key="test_openweather_archive"):
-        try:
-            with st.spinner("Checking historical archive access..."):
-                archive_payload, archive_sample, archive_start, archive_end = fetch_openweather_archive_probe(
-                    row["latitude"], row["longitude"]
-                )
-            archive_records = archive_payload.get("list", [])
-            if archive_records and not archive_sample.empty:
-                st.success(f"Older archive access confirmed. Returned {len(archive_records)} hourly records for {loc}.")
-                st.caption(f"Requested UTC window: {archive_start:%Y-%m-%d %H:%M} to {archive_end:%Y-%m-%d %H:%M}.")
-                st.write("Variables returned:", ", ".join(sorted(archive_sample["variable"].unique())))
-                st.dataframe(archive_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")
-            else:
-                st.warning("The request returned no usable hourly observations for January 2020. Recent history works, but older archive access is not yet confirmed.")
-        except api_http.ApiError as e:
-            st.warning(f"Older archive access was not confirmed. HTTP status: {e.status}. {e.hint or 'The account may have a limited historical window.'}")
-        except (KeyError, TypeError, ValueError) as e:
-            st.warning(f"The older archive response did not pass the parser check: {e}")
-
-    with st.expander("How this source is used"):
-        st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. Historical OpenWeather data will only be added after the endpoint entitlement and live response structure are verified.")
+        st.markdown("### Test recent historical weather")
+        st.write("Requests the latest 24 hourly timestamps. If your plan permits historical access, the response will be plotted below. We can then test deeper archive periods.")
+        if st.button("Load last 24 hours", key="load_agro_history"):
+            st.session_state["agro_history_requested"] = True
+        if st.session_state.get("agro_history_requested", False):
+            try:
+                with st.spinner("Requesting Agromonitoring hourly history..."):
+                    agro_payload, agro_sample, agro_start, agro_end = fetch_agromonitoring_history(
+                        row["latitude"], row["longitude"]
+                    )
+                if not agro_sample.empty:
+                    available = sorted(agro_sample["variable"].unique())
+                    labels = {"temp":"Air temperature","humidity":"Relative humidity","pressure":"Air pressure","wind_speed":"Wind speed","cloud_cover":"Cloud cover"}
+                    chosen = st.selectbox("Historical variable", available, format_func=lambda v: f"{labels.get(v,v)} ({agro_sample.loc[agro_sample.variable==v,'unit'].iloc[0]})", key="agro_history_variable")
+                    series = agro_sample[agro_sample.variable==chosen].sort_values("date")
+                    fig_ag = go.Figure(go.Scatter(x=series.date,y=series.value,mode="lines+markers",name=labels.get(chosen,chosen)))
+                    fig_ag.update_layout(title=f"{labels.get(chosen,chosen)} · Agromonitoring hourly history",xaxis_title="Time (UTC)",yaxis_title=series.unit.iloc[0],height=390,hovermode="x unified",plot_bgcolor="white",paper_bgcolor="white")
+                    st.plotly_chart(fig_ag,width="stretch")
+                    st.success(f"Historical access confirmed. Returned {len(agro_payload)} hourly records.")
+                    st.caption(f"Requested UTC window: {agro_start:%Y-%m-%d %H:%M} to {agro_end:%Y-%m-%d %H:%M}.")
+                    st.dataframe(series[["date","value","unit"]],hide_index=True,width="stretch")
+                else:
+                    st.warning("The endpoint responded but returned no usable hourly observations.")
+            except api_http.ApiError as e:
+                st.warning(f"Agromonitoring historical access was not confirmed: {str(e)}")
+            except (KeyError, TypeError, ValueError) as e:
+                st.warning(f"Agromonitoring historical response could not be parsed: {e}")
+    with st.expander("How Agromonitoring data is used"):
+        st.markdown("Agromonitoring weather is kept separate from NASA POWER and OpenWeather. It is not added to climate trend calculations. Temperature in the historical API is converted from Kelvin to Celsius by the ingestion parser.")
 
 st.divider()
 st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
