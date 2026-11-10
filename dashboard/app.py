@@ -16,6 +16,27 @@ st.set_page_config(page_title="EarthScope | Environmental intelligence", page_ic
 
 st.markdown("""
 <style>
+
+/* Accessible contrast: dark body copy, readable secondary text and form labels */
+html, body, [class*="css"], .stApp, .stMarkdown, .stText, p, li, label,
+[data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"] {
+ color:#203744 !important;
+}
+.stCaption, [data-testid="stCaptionContainer"], small {
+ color:#526875 !important;
+}
+[data-testid="stMetricLabel"] { color:#425B68 !important; }
+[data-testid="stMetricValue"] { color:#173344 !important; }
+[data-testid="stMetricDelta"] { color:#365765 !important; }
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] label,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+ color:#203744 !important;
+}
+[data-baseweb="select"] *, [data-baseweb="input"] *, textarea {
+ color:#203744 !important;
+}
+.stAlert p, .stAlert li { color:#243B48 !important; }
+[data-testid="stDataFrame"] { color:#203744 !important; }
 .stApp{background:#F7F8F6}.block-container{padding:2rem 2rem 3rem;max-width:1450px}
 [data-testid="stSidebar"]{background:#EEF3F1}
 [data-testid="stMetric"]{background:white;border:1px solid #E2EAE6;padding:14px;border-radius:13px;min-width:0}
