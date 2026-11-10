@@ -167,6 +167,17 @@ def fetch_openweather_current(lat, lon):
     """Fetch one current-conditions snapshot; cache for ten minutes."""
     return owm.current_weather(float(lat), float(lon), units="metric")
 
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_openweather_history_probe(lat, lon):
+    """Request a small, recent historical sample to verify account entitlement."""
+    end = pd.Timestamp.now(tz="UTC").floor("h")
+    start = end - pd.Timedelta(hours=3)
+    payload = owm.history_hourly(
+        float(lat), float(lon), int(start.timestamp()), int(end.timestamp()), units="metric"
+    )
+    parsed = owm.parse_history_hourly(payload, "Selected location", float(lat), float(lon))
+    return payload, parsed, start, end
+
 data=load_data()
 if data is None:
     st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation</div><h1>EarthScope</h1><p>Understand how environmental conditions change across time and place.</p></div>',unsafe_allow_html=True)
@@ -310,8 +321,29 @@ with owtab:
             except (KeyError, TypeError, ValueError, ZeroDivisionError):
                 st.warning("OpenWeather returned a response that did not match the expected structure. The NASA POWER analysis remains available.")
 
+    st.markdown("### Check historical data access")
+    st.write("This makes a small request for the most recent three completed hours. It checks whether the API key can access OpenWeather's hourly History API and whether the response contains usable observations. It does not download a long archive or alter the NASA dataset.")
+    if st.button("Test historical API access", key="test_openweather_history"):
+        try:
+            with st.spinner("Checking OpenWeather historical access..."):
+                payload, history_sample, start, end = fetch_openweather_history_probe(
+                    row["latitude"], row["longitude"]
+                )
+            records = payload.get("list", [])
+            if len(records) and not history_sample.empty:
+                st.success(f"Historical access confirmed. OpenWeather returned {len(records)} hourly records for {loc}.")
+                st.caption(f"Requested UTC window: {start:%Y-%m-%d %H:%M} to {end:%Y-%m-%d %H:%M}.")
+                st.write("Variables returned:", ", ".join(sorted(history_sample["variable"].unique())))
+                st.dataframe(history_sample[["date", "variable", "value", "unit"]], hide_index=True, width="stretch")
+            else:
+                st.warning("The endpoint responded, but the sample contained no usable hourly observations. We should inspect the response before building ingestion.")
+        except api_http.ApiError as e:
+            st.warning(f"Historical access was not confirmed. HTTP status: {e.status}. {e.hint or 'Check the account subscription and endpoint permissions.'}")
+        except (KeyError, TypeError, ValueError) as e:
+            st.warning(f"The endpoint response did not pass the parser check: {e}")
+
     with st.expander("How this source is used"):
-        st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. A historical OpenWeather series will only be added after the relevant historical endpoint and live response structure are verified.")
+        st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. Historical OpenWeather data will only be added after the endpoint entitlement and live response structure are verified.")
 
 st.divider()
 st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
