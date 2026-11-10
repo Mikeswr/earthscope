@@ -182,8 +182,41 @@ def fetch_openweather_history_probe(lat, lon):
 def fetch_openweather_timestamp_probe(lat, lon):
     """Test one timestamp from January 2020 using the separate Timestamp History API."""
     timestamp = pd.Timestamp("2020-01-15 12:00:00", tz="UTC")
-    payload = owm.history_timestamp(float(lat), float(lon), int(timestamp.timestamp()))
-    parsed = owm.parse_history_timestamp(payload, "Selected location", float(lat), float(lon))
+    # Call the endpoint directly here so this probe does not depend on a cached
+    # imported module version during Streamlit Cloud hot-reloads.
+    payload = api_http.call(
+        "GET",
+        "https://api.openweathermap.org/data/3.0/onecall/timemachine",
+        secret=config.get_key(config.ENV_OPENWEATHER),
+        params={"lat": float(lat), "lon": float(lon), "dt": int(timestamp.timestamp()), "units": "metric"},
+    )[1]
+    observations = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(observations, list) or not observations or not observations[0].get("dt"):
+        raise ValueError("Timestamp History response has no valid data observation.")
+    obs = observations[0]
+    observed = pd.to_datetime(obs["dt"], unit="s", utc=True).tz_localize(None)
+    fields = [
+        ("temp", obs.get("temp"), "C", "hourly_instantaneous"),
+        ("feels_like", obs.get("feels_like"), "C", "hourly_instantaneous"),
+        ("pressure", obs.get("pressure"), "hPa", "hourly_instantaneous"),
+        ("humidity", obs.get("humidity"), "%", "hourly_instantaneous"),
+        ("wind_speed", obs.get("wind_speed"), "m/s", "hourly_instantaneous"),
+        ("cloud_cover", obs.get("clouds"), "%", "hourly_instantaneous"),
+        ("visibility", obs.get("visibility"), "m", "hourly_instantaneous"),
+        ("rain_1h", (obs.get("rain") or {}).get("1h"), "mm", "hourly_accumulation"),
+    ]
+    rows = [
+        {"location": "Selected location", "latitude": float(lat), "longitude": float(lon),
+         "date": observed, "variable": variable, "value": float(value), "unit": unit,
+         "unit_source": "response_units_metric", "statistic": statistic,
+         "source": "OpenWeather One Call 3.0 Timestamp History API",
+         "data_kind": "blended_measured_and_model_unverified"}
+        for variable, value, unit, statistic in fields if value is not None
+    ]
+    parsed = pd.DataFrame(rows, columns=[
+        "location", "latitude", "longitude", "date", "variable", "value", "unit",
+        "unit_source", "statistic", "source", "data_kind"
+    ])
     return payload, parsed, timestamp
 
 
