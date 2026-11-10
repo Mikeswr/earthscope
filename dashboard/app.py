@@ -392,8 +392,11 @@ with agtab:
                 condition = weather_items[0].get("description", "Conditions not described") if weather_items else "Conditions not described"
                 st.markdown(f"**{loc}** · {condition.title()}")
                 c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Air temperature", f"{number(main.get('temp'), 1)} °C")
-                c2.metric("Feels like", f"{number(main.get('feels_like'), 1)} °C")
+                # Agromonitoring current weather returns Kelvin by default.
+                temp_c = None if main.get("temp") is None else float(main["temp"]) - 273.15
+                feels_c = None if main.get("feels_like") is None else float(main["feels_like"]) - 273.15
+                c1.metric("Air temperature", f"{number(temp_c, 1)} °C")
+                c2.metric("Feels like", f"{number(feels_c, 1)} °C")
                 c3.metric("Relative humidity", f"{number(main.get('humidity'), 0)} %")
                 c4.metric("Wind speed", f"{number(wind.get('speed'), 1)} m/s")
                 st.caption("Agromonitoring current weather API. Current conditions are not a historical observation series.")
