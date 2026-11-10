@@ -273,6 +273,7 @@ with about:
     st.dataframe(pd.DataFrame(meta.get("variables",{})).T.drop(columns=["response_parameter_metadata_verbatim"],errors="ignore"),width="stretch")
 
 
+
 with owtab:
     st.markdown("### Current weather conditions")
     st.write("A separate, recent snapshot from OpenWeather for the selected location. This is not part of the NASA POWER historical trend analysis.")
@@ -286,24 +287,24 @@ with owtab:
         if st.session_state["ow_current_requested"]:
             try:
                 ow = fetch_openweather_current(row["latitude"], row["longitude"])
-            main = ow["main"]
-            wind = ow.get("wind", {})
-            weather_items = ow.get("weather") or []
-            condition = weather_items[0].get("description", "Conditions not described") if weather_items else "Conditions not described"
-            st.markdown(f"**{loc}** · {condition.title()}")
-            w1, w2, w3, w4 = st.columns(4)
-            w1.metric("Air temperature", f"{number(main.get('temp'), 1)} °C")
-            w2.metric("Feels like", f"{number(main.get('feels_like'), 1)} °C")
-            w3.metric("Relative humidity", f"{number(main.get('humidity'), 0)} %")
-            w4.metric("Wind speed", f"{number(wind.get('speed'), 1)} m/s")
-            x1, x2, x3 = st.columns(3)
-            x1.metric("Air pressure", f"{number(main.get('pressure'), 0)} hPa")
-            x2.metric("Cloud cover", f"{number(ow.get('clouds', {}).get('all'), 0)} %")
-            x3.metric("Visibility", f"{number(ow.get('visibility') / 1000, 1)} km" if ow.get("visibility") is not None else "Not available")
-            offset = int(ow.get("timezone", 0) or 0)
-            observed_at = pd.to_datetime(ow["dt"], unit="s", utc=True) + pd.to_timedelta(offset, unit="s")
-            st.caption(f"OpenWeather Current Weather API · API timestamp: {observed_at.strftime('%Y-%m-%d %H:%M')} local time · Cached for up to 10 minutes.")
-            st.caption("OpenWeather current conditions can combine multiple data inputs. They are shown as a recent snapshot, not as a station observation or a climate trend.")
+                main = ow["main"]
+                wind = ow.get("wind", {})
+                weather_items = ow.get("weather") or []
+                condition = weather_items[0].get("description", "Conditions not described") if weather_items else "Conditions not described"
+                st.markdown(f"**{loc}** · {condition.title()}")
+                w1, w2, w3, w4 = st.columns(4)
+                w1.metric("Air temperature", f"{number(main.get('temp'), 1)} °C")
+                w2.metric("Feels like", f"{number(main.get('feels_like'), 1)} °C")
+                w3.metric("Relative humidity", f"{number(main.get('humidity'), 0)} %")
+                w4.metric("Wind speed", f"{number(wind.get('speed'), 1)} m/s")
+                x1, x2, x3 = st.columns(3)
+                x1.metric("Air pressure", f"{number(main.get('pressure'), 0)} hPa")
+                x2.metric("Cloud cover", f"{number(ow.get('clouds', {}).get('all'), 0)} %")
+                x3.metric("Visibility", f"{number(ow.get('visibility') / 1000, 1)} km" if ow.get("visibility") is not None else "Not available")
+                offset = int(ow.get("timezone", 0) or 0)
+                observed_at = pd.to_datetime(ow["dt"], unit="s", utc=True) + pd.to_timedelta(offset, unit="s")
+                st.caption(f"OpenWeather Current Weather API · API timestamp: {observed_at.strftime('%Y-%m-%d %H:%M')} local time · Cached for up to 10 minutes.")
+                st.caption("OpenWeather current conditions can combine multiple data inputs. They are shown as a recent snapshot, not as a station observation or a climate trend.")
             except api_http.ApiError as e:
                 st.warning(f"OpenWeather could not return data for this location. HTTP status: {e.status}. {e.hint or 'Check the API key and endpoint access.'}")
             except (KeyError, TypeError, ValueError, ZeroDivisionError):
@@ -311,7 +312,6 @@ with owtab:
 
     with st.expander("How this source is used"):
         st.markdown("OpenWeather current conditions are displayed separately from NASA POWER. The two sources are not merged, resampled, or used together in Mann-Kendall tests. A historical OpenWeather series will only be added after the relevant historical endpoint and live response structure are verified.")
-
 
 st.divider()
 st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
