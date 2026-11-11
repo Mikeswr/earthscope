@@ -42,6 +42,29 @@ html, body, [class*="css"], .stApp, .stMarkdown, .stText, p, li, label,
 [data-testid="stDataFrame"] { color:#203744 !important; }
 .stApp{background:#F7F8F6}.block-container{padding:2rem 2rem 3rem;max-width:1450px}
 [data-testid="stSidebar"]{background:#EEF3F1}
+/* Keep Streamlit's sidebar close/collapse control visible on mobile and desktop */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebar"] button[kind="header"],
+[data-testid="stHeader"] button[kind="header"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #173344 !important;
+  background: #E1ECE8 !important;
+  border: 1px solid #B8CEC6 !important;
+  border-radius: 8px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  z-index: 1001 !important;
+}
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebar"] button[kind="header"] svg,
+[data-testid="stHeader"] button[kind="header"] svg {
+  color: #173344 !important;
+  fill: #173344 !important;
+  stroke: #173344 !important;
+  opacity: 1 !important;
+}
 [data-testid="stMetric"]{background:white;border:1px solid #E2EAE6;padding:14px;border-radius:13px;min-width:0}
 .hero{background:linear-gradient(115deg,#102F40,#176E73);color:white;padding:30px 34px;border-radius:18px;margin-bottom:22px}
 .hero h1{color:white;font-size:2.4rem;margin:0 0 6px}.hero p{color:#D7EAE7;margin:0;font-size:1.05rem}
