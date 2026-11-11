@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/validate_forecasts.py"
       - "forecasting/**"
+      - "dashboard/app.py"
       - ".github/workflows/forecast-validation.yml"
       - "data/processed/power_monthly_standardised.csv"
 
@@ -23,6 +24,8 @@ jobs:
           cache: "pip"
       - name: Install validation dependencies
         run: python -m pip install --upgrade pip numpy pandas scipy statsmodels tabulate
+      - name: Compile dashboard Python files
+        run: python -m compileall -q dashboard
       - name: Validate forecasts on committed NASA POWER data
         run: python scripts/validate_forecasts.py
       - name: Upload validation report and forecasts
