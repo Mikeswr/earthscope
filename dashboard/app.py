@@ -405,8 +405,8 @@ with agtab:
             except (KeyError, TypeError, ValueError) as e:
                 st.warning(f"Agromonitoring response could not be read: {e}")
 
-        st.markdown("### Test recent historical weather")
-        st.write("Requests the latest 24 hourly timestamps. If your plan permits historical access, the response will be plotted below. We can then test deeper archive periods.")
+        st.markdown("### Recent hourly weather")
+        st.write("Loads the latest 24 hourly timestamps available to your account. This short recent-history view is for live monitoring only. Older archive access was tested and is not available for the requested historical date under the current subscription.")
         if st.button("Load last 24 hours", key="load_agro_history"):
             st.session_state["agro_history_requested"] = True
         if st.session_state.get("agro_history_requested", False):
