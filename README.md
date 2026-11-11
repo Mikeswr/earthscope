@@ -50,7 +50,7 @@ With downloaded NASA POWER files:
 
 With internet access, scripts/fetch_power.py can download NASA POWER data. See the script help for options. The generated reports and tables are written to the selected output directory, which defaults to a local reports/ folder.
 
-## Statistical approach
+The detailed method specification is available in [METHODS.md](METHODS.md).\n\n## Statistical approach
 
 - Missing and flagged observations remain at their original calendar positions as missing values. No interpolation is performed.
 - Annual means are day-weighted from monthly values and require all 12 months. T2M_MAX and T2M_MIN use annual maxima and minima of the monthly extremes, respectively.
