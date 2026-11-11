@@ -14,6 +14,7 @@ from earthscope.trends.pipeline import annual_series, monthly_series
 from earthscope.ingest import openweather as owm
 from earthscope.ingest import agromonitoring as agro
 from earthscope.ingest import http as api_http
+from earthscope.forecasting.engine import ForecastError, forecast_monthly
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
@@ -253,7 +254,7 @@ c.metric("Estimated change per decade",f"{number(row['sen_per_decade'])} {unit}"
 d.metric("FDR-adjusted p-value",number(row["mk_p_fdr"],4),help="Multiple-testing-adjusted statistical evidence, not the probability that a trend is true.")
 st.caption("NASA POWER historical monthly data. These are gridded estimates, not direct weather-station observations.")
 
-ts,tr,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
+ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -284,6 +285,81 @@ with tr:
     st.caption(f"FDR correction family: {fam.replace('_',' ')} ({family_n} valid tests). Annual Mann-Kendall approximately accounts for lag-1 autocorrelation. A year requires all 12 valid months. Seasonal p-values are not used for significance claims because neighbouring months are correlated.")
     with st.expander("How should I read the evidence classification?"):
         st.markdown("- **Significant after FDR:** adjusted p-value below 0.05.\n- **Significant before FDR only:** raw p-value below 0.05, but adjusted result is not.\n- **Not significant:** insufficient statistical evidence of a monotonic trend.\n- **Insufficient data:** minimum data requirements were not met.")
+
+
+with fu:
+    st.markdown("### What might happen next?")
+    st.write("EarthScope compares forecasting methods against withheld historical observations, then uses the best-performing method for a statistical outlook.")
+    st.warning("These are statistical extrapolations from NASA POWER grid-cell data, not climate-model projections or guaranteed future conditions. They do not account for future emissions, policy, land-use change or climate scenarios.")
+    horizon = st.select_slider("Forecast horizon", options=[12, 24, 36, 48, 60], value=24,
+                               format_func=lambda n: f"{n // 12} year" if n == 12 else f"{n // 12} years")
+    bounds = {
+        "PRECTOTCORR": (0.0, None),
+        "RH2M": (0.0, 100.0),
+        "WS10M": (0.0, None),
+        "ALLSKY_SFC_SW_DWN": (0.0, None),
+    }
+    try:
+        lower, upper = bounds.get(var, (None, None))
+        forecast, forecast_info = forecast_monthly(
+            m, horizon_months=int(horizon), lower_bound=lower, upper_bound=upper
+        )
+        chosen = forecast_info["selected_model"]
+        chosen_metrics = forecast_info["metrics"][chosen]
+        baseline_metrics = forecast_info["metrics"]["seasonal_naive"]
+        x1, x2, x3 = st.columns(3)
+        x1.metric("Selected method", chosen.replace("_", " ").title())
+        x2.metric("Backtest MAE", f"{chosen_metrics['mae']:.3f} {unit}")
+        x3.metric("Backtest RMSE", f"{chosen_metrics['rmse']:.3f} {unit}")
+        skill = forecast_info["skill_vs_seasonal_naive"] * 100
+        if chosen == "seasonal_naive":
+            st.info("The seasonal-naive baseline performed best. EarthScope has not found evidence that a more complex model improves the one-year backtest.")
+        elif skill > 0:
+            st.success(f"The selected method reduced backtest MAE by {skill:.1f}% compared with the seasonal-naive baseline.")
+        else:
+            st.warning(f"The selected method did not outperform the seasonal-naive baseline on MAE ({skill:.1f}% skill). Treat this outlook cautiously.")
+        hist = m.iloc[-60:]
+        fig_f = go.Figure()
+        fig_f.add_trace(go.Scatter(x=hist.index, y=hist.values, mode="lines",
+                                   name="Observed monthly values", line=dict(color="#2386C8", width=1.5)))
+        fig_f.add_trace(go.Scatter(x=forecast.date, y=forecast.upper_95, mode="lines",
+                                   line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig_f.add_trace(go.Scatter(x=forecast.date, y=forecast.lower_95, mode="lines",
+                                   line=dict(width=0), fill="tonexty", fillcolor="rgba(28,114,147,0.10)",
+                                   name="95% empirical error band", hoverinfo="skip"))
+        fig_f.add_trace(go.Scatter(x=forecast.date, y=forecast.upper_80, mode="lines",
+                                   line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig_f.add_trace(go.Scatter(x=forecast.date, y=forecast.lower_80, mode="lines",
+                                   line=dict(width=0), fill="tonexty", fillcolor="rgba(28,114,147,0.20)",
+                                   name="80% empirical error band", hoverinfo="skip"))
+        fig_f.add_trace(go.Scatter(x=forecast.date, y=forecast.forecast, mode="lines",
+                                   name="Forecast", line=dict(color="#D95745", width=2.5, dash="dash")))
+        fig_f.add_vline(x=m.index.max(), line_dash="dot", line_color="#526875")
+        fig_f.update_layout(title=f"{loc} · {var} statistical outlook",
+                            yaxis_title=f"{name(var)} ({unit})", xaxis_title="Month",
+                            height=460, hovermode="x unified", plot_bgcolor="white", paper_bgcolor="white",
+                            legend=dict(orientation="h", y=-0.25))
+        st.plotly_chart(fig_f, width="stretch")
+        metrics_table = pd.DataFrame([
+            {"Method": model.replace("_", " ").title(), **values}
+            for model, values in forecast_info["metrics"].items()
+        ]).rename(columns={"mae": f"MAE ({unit})", "rmse": f"RMSE ({unit})",
+                           "bias": f"Bias ({unit})", "n_predictions": "Withheld months",
+                           "n_origins": "Backtest origins"})
+        st.markdown("#### Historical backtest comparison")
+        st.dataframe(metrics_table.round(3), hide_index=True, width="stretch")
+        st.caption(f"Training period: {forecast_info['training_start']} to {forecast_info['training_end']} · "
+                   f"{forecast_info['n_training_months']} monthly observations · "
+                   f"{forecast_info['n_origins']} rolling-origin backtests.")
+        st.caption(forecast_info["interval_warning"])
+        st.download_button("Download monthly outlook (CSV)", forecast.to_csv(index=False),
+                           f"earthscope_{loc}_{var}_outlook.csv", "text/csv")
+        with st.expander("How EarthScope produces this outlook"):
+            st.markdown("Three candidates are evaluated: seasonal-naive, linear trend with calendar-month effects, and damped additive exponential smoothing. Each backtest trains only on earlier data and predicts the next 12 months. The method with the lowest pooled one-year mean absolute error is selected. The 80% and 95% bands are approximate empirical bands calibrated from withheld absolute errors and widened with lead time. They are not formal climate projection intervals.")
+    except ForecastError as exc:
+        st.warning(f"A forecast is not available for this series: {exc}")
+    except Exception as exc:
+        st.error(f"The forecasting run could not be completed safely: {exc}")
 
 with an:
     st.markdown("### When did unusual conditions occur?")
