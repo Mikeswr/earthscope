@@ -257,7 +257,8 @@ featured_solar = trends[
 ]
 if not featured_solar.empty:
     solar = featured_solar.iloc[0]
-    st.markdown("### A finding from Accra")
+    st.markdown("### Featured example: Accra solar energy")
+    st.caption("This is a fixed introductory case study. It does not change when you select a different location or variable below.")
     solar_metric, solar_story = st.columns([1, 2])
     solar_metric.metric(
         "Estimated change in surface solar energy",
@@ -325,6 +326,64 @@ a.metric("Valid years",str(int(row["n_years"])) if pd.notna(row["n_years"]) else
 b.metric("Trend direction",str(row["mk_trend"]).replace("_"," ").title())
 c.metric("Estimated change per decade",f"{number(row['sen_per_decade'])} {unit}" if pd.notna(row["sen_per_decade"]) else "n/a")
 d.metric("FDR-adjusted p-value",number(row["mk_p_fdr"],4),help="Multiple-testing-adjusted statistical evidence, not the probability that a trend is true.")
+
+# This interpretation is driven by the sidebar selections and updates on every rerun.
+st.markdown("### Your selected result")
+direction = str(row.get("mk_trend", "not assessed")).lower()
+evidence = str(row.get("evidence_class", "insufficient_data")).lower()
+slope = row.get("sen_per_decade", np.nan)
+ci_low = row.get("sen_ci_low_per_decade", np.nan)
+ci_high = row.get("sen_ci_high_per_decade", np.nan)
+start_year = row.get("first_year", np.nan)
+end_year = row.get("last_year", np.nan)
+period_text = (
+    f"from {int(start_year)} to {int(end_year)}"
+    if pd.notna(start_year) and pd.notna(end_year)
+    else "over the available analysis period"
+)
+if evidence == "significant_after_fdr" and direction in ("increasing", "decreasing"):
+    direction_word = "upward" if direction == "increasing" else "downward"
+    plain_result = (
+        f"For **{loc}**, the long-term pattern in **{name(var).lower()}** is {direction_word} "
+        f"{period_text}. The estimated rate of change is **{number(slope)} {unit} per decade**. "
+        "The trend remains statistically significant after adjustment for multiple testing."
+    )
+    st.success(plain_result)
+elif evidence == "significant_before_fdr_only" and direction in ("increasing", "decreasing"):
+    direction_word = "upward" if direction == "increasing" else "downward"
+    plain_result = (
+        f"For **{loc}**, the estimated pattern in **{name(var).lower()}** is {direction_word} "
+        f"{period_text}, at **{number(slope)} {unit} per decade**. However, the evidence does "
+        "not remain statistically significant after accounting for multiple comparisons. "
+        "Treat this as a possible signal, not a confirmed trend."
+    )
+    st.warning(plain_result)
+elif evidence == "not_significant":
+    plain_result = (
+        f"For **{loc}**, this analysis does not find sufficient statistical evidence of a "
+        f"consistent long-term upward or downward trend in **{name(var).lower()}** {period_text}. "
+        "That does not mean the variable never changes. It means the long-term direction is "
+        "not clear enough in this analysis."
+    )
+    st.info(plain_result)
+else:
+    plain_result = (
+        f"A reliable trend classification is not available for **{name(var).lower()}** at "
+        f"**{loc}** because the available data do not meet the analysis requirements."
+    )
+    st.info(plain_result)
+
+if pd.notna(slope) and pd.notna(ci_low) and pd.notna(ci_high):
+    st.caption(
+        f"Estimated change: {number(slope)} {unit} per decade · "
+        f"95% confidence interval: {number(ci_low)} to {number(ci_high)} · "
+        f"FDR-adjusted p-value: {number(row.get('mk_p_fdr', np.nan), 4)}."
+    )
+st.caption(
+    "These results describe NASA POWER gridded estimates at the selected grid point, "
+    "not direct station measurements. Statistical evidence does not identify the cause "
+    "of the observed pattern."
+)
 st.caption("NASA POWER historical monthly data. These are gridded estimates, not direct weather-station observations.")
 
 ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
