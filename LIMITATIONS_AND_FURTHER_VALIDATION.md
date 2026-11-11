@@ -35,4 +35,4 @@ Five locations are five separate series. They do not support a spatial trend map
 
 ## 6. Software status
 
-The validation, import, QC and trend code is covered by automated tests with synthetic fixtures and by cross checks against scipy and pymannkendall. The OpenWeather and Agromonitoring clients are written from the vendors' documentation and have not been tested against live responses; nothing in these reports uses them.
+The validation, import, QC and trend code is covered by automated tests with synthetic fixtures and by cross checks against scipy and pymannkendall. OpenWeather current conditions and a recent four-hour history view have been tested in the deployed dashboard. Agromonitoring current weather and recent hourly history have also been tested. These live weather responses are separate from the NASA POWER analysis and are not used in the trend results. Older Agromonitoring archive access was not available for the requested January 2020 period under the tested account.
