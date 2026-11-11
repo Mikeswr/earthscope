@@ -1,35 +1,81 @@
-EarthScope
+# EarthScope
 
-Environmental trend analysis for Ghana from NASA POWER monthly data, with a Streamlit dashboard. NASA POWER values are gridded estimates built from reanalysis and satellite based sources. They are not direct station observations, and five locations are five separate series, not a spatial trend map.
+**A geospatial intelligence platform for exploring environmental trends in Ghana.**
 
-Setup
-1. python -m venv .venv and activate it
-2. pip install -r requirements.txt
-3. OpenWeather current conditions require OPENWEATHER_API_KEY. In Streamlit Community Cloud, add it under App settings → Secrets as OPENWEATHER_API_KEY = "your_api_key". Locally, set it as an environment variable or in .env. Never commit or share API keys. Agromonitoring credentials are only needed for its separate client.
+EarthScope combines long-term climate analysis from NASA POWER with separate live weather monitoring panels from OpenWeather and Agromonitoring.
 
-Workflow with downloaded NASA POWER files (details in docs/MANUAL_DOWNLOAD.md)
-1. python scripts/validate_power_files.py <folder>      checks the files, changes nothing
-2. python scripts/import_power.py <folder>              imports, refuses unit, identity or overlap problems
-3. python scripts/run_analysis.py                       QC tables, trends, sensitivity runs, comparison tables
-4. python scripts/make_figures.py                       figures
-5. python scripts/make_reports.py                       four markdown reports from the tables
-6. streamlit run dashboard/app.py            dashboard
-With internet access, scripts/fetch_power.py downloads the files itself. scripts/inspect_file.py prints a file's structure without values.
+**Public dashboard:** https://earthscope.streamlit.app/  
+**Repository:** https://github.com/Mikeswr/earthscope
 
-Outputs
-data/raw                      imported files, each with an .import.json record (original name, checksum)
-data/processed                standardised table, metadata with checksums and coverage, trend_results.csv, anomalies.csv
-reports/                      IMPORT_AND_DATA_QUALITY_REPORT.md, TREND_ANALYSIS_REPORT.md, LOCATION_COMPARISON_TABLES.md, LIMITATIONS_AND_FURTHER_VALIDATION.md, preimport_validation.json, analysis_run.json
-reports/tables, reports/figures   every table as CSV, and the figures
+## What it does
 
-Method summary (details and limits in docs/METHODS.md)
-Units come from the response metadata and mismatches are rejected. Flagged and missing values stay in the data as NaN at their calendar position and are excluded from statistics; nothing is interpolated. Annual values: day-weighted mean, annual maximum for T2M_MAX, annual minimum for T2M_MIN, all 12 months required. Sen's slope and the tests use real elapsed years, and coverage rules count flagged years at the start, middle and end. Annual Mann-Kendall inflates its variance for lag-1 autocorrelation. FDR is applied within pre-declared families, and uncorrected and corrected significance are always shown together with one evidence class per series. The seasonal test is not used for significance. Each test has documented minimum data and reports a reason when it is not met.
+- Explore monthly environmental variables for Accra, Kumasi, Tamale, Wa and Takoradi.
+- Examine the 1981–2025 NASA POWER record for seven variables: T2M, T2M_MAX, T2M_MIN, PRECTOTCORR, RH2M, WS10M and ALLSKY_SFC_SW_DWN.
+- Compare annual series, anomalies, quality-control flags, trend estimates and evidence classes.
+- View point-level trend comparisons on a map.
+- Check current weather through OpenWeather and Agromonitoring, with recent hourly history where the configured account permits it.
 
-Tests
-python -m pytest
-The tests use synthetic data labelled SYNTHETIC TEST DATA. If such data is ever loaded, the dashboard shows a red warning, the label follows the data into every output, and run_analysis.py and make_reports.py refuse it.
+## Data sources and interpretation
 
-Status
-Done and run on the five real NASA POWER files: validation, import, QC, trend analysis, sensitivity runs, figures, reports.
-Not verified: agreement of POWER values with station records; live OpenWeather and Agromonitoring responses. The dashboard now has a separate OpenWeather current-conditions panel, but it requires the user's API key and has not yet been tested against that live account. OpenWeather current conditions are not included in NASA POWER trend calculations. Historical OpenWeather integration remains gated on confirming endpoint entitlement and live response structure.
-Not built: a covariance corrected seasonal test, gridded spatial trend maps (needs gridded input), deployment, Space Apps submission materials.
+### NASA POWER
+
+The climate-analysis dataset consists of monthly NASA POWER point/grid-cell estimates for five configured locations. These are gridded estimates based on satellite and model/reanalysis inputs, not direct station observations.
+
+The five locations are five separate time series. They do **not** constitute a continuous spatial trend map and do not support claims about every location in Ghana.
+
+### OpenWeather
+
+The dashboard provides current conditions and a recent four-hour historical view. The recent hourly records are observations/history, not a forecast. Older historical archive access and One Call 3.0 timestamp history were not available under the tested account access.
+
+Set OPENWEATHER_API_KEY in Streamlit Community Cloud secrets or as a local environment variable. Never commit API keys.
+
+### Agromonitoring
+
+The dashboard provides current weather and a recent hourly history view. A request for January 2020 returned HTTP 400, requested data is out of allowed range, under the tested account. Older archive access is therefore not claimed.
+
+Set AGROMONITORING_API_KEY only if using this separate client. Keep its outputs separate from NASA POWER climate-trend calculations.
+
+**Live weather data are not merged into the NASA POWER analysis.** Differences in source, temporal resolution, spatial support and access period mean they must be interpreted separately.
+
+## Analysis workflow
+
+With downloaded NASA POWER files:
+
+1. python scripts/validate_power_files.py <folder> validates the files without importing them.
+2. python scripts/import_power.py <folder> imports the files and builds the standardised dataset.
+3. python scripts/run_analysis.py runs QC summaries, trend analysis, sensitivity runs and comparison tables.
+4. python scripts/make_figures.py generates figures.
+5. python scripts/make_reports.py generates Markdown reports from the analysis tables.
+6. streamlit run dashboard/app.py launches the dashboard locally.
+
+With internet access, scripts/fetch_power.py can download NASA POWER data. See the script help for options.
+
+## Statistical approach
+
+- Missing and flagged observations remain at their original calendar positions as missing values. No interpolation is performed.
+- Annual means are day-weighted from monthly values and require all 12 months. T2M_MAX and T2M_MIN use annual maxima and minima of the monthly extremes, respectively.
+- Sen's slope uses actual elapsed years and is reported per decade.
+- Annual Mann-Kendall variance uses a lag-1 autocorrelation effective-sample-size adjustment (ar1_neff) in the primary analysis. Hamed-Rao and no-correction results are included as sensitivity checks.
+- Benjamini-Hochberg false-discovery-rate correction is applied within the declared primary and secondary variable families. Both uncorrected and adjusted p-values are retained.
+- Seasonal Mann-Kendall results are calculated for diagnostics but are not used to make significance claims because between-month dependence is not corrected.
+- Sensitivity runs examine alternative autocorrelation correction, FDR method, annual aggregation, common-period coverage and precipitation extremes.
+
+## Current status
+
+**Implemented and previously run on the five supplied NASA POWER files:** file validation, import, quality control, trend analysis, sensitivity analysis, figures and report generation.
+
+**Live dashboard:** publicly deployed. OpenWeather current conditions and four-hour history have been tested successfully. Agromonitoring current weather and recent hourly history have also been tested successfully. A January 2020 Agromonitoring archive request was rejected as outside the account's allowed range.
+
+**Not yet independently validated:** agreement between NASA POWER estimates and ground station observations; the physical interpretation of the observed solar-radiation decline; precipitation extremes and change points.
+
+**Not implemented:** continuous gridded spatial trend maps from a multi-year raster dataset; a dependence-corrected seasonal significance test; independent station validation; final Space Apps submission materials.
+
+## Reproducibility and tests
+
+Run the automated suite with:
+
+    python -m pytest
+
+Synthetic fixtures are labelled SYNTHETIC TEST DATA. The analysis and report scripts refuse synthetic data by default, and the dashboard displays a warning if synthetic data are loaded.
+
+Raw source files and API credentials should not be committed. Processed outputs retained in the repository must include their provenance metadata.
