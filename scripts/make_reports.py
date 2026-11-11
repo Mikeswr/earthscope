@@ -345,7 +345,7 @@ def main(argv=None):
                "Month 13 (the annual value NASA supplies) is not used. The annual series is built from the monthly values."]:
         a("- " + t_)
     a("\n## 6. Software status\n")
-    a("The validation, import, QC and trend code is covered by automated tests with synthetic fixtures and by cross checks against scipy and pymannkendall. The OpenWeather and Agromonitoring clients are written from the vendors' documentation and have not been tested against live responses; nothing in these reports uses them.\n")
+    a("The validation, import, QC and trend code is covered by automated tests with synthetic fixtures and by cross checks against scipy and pymannkendall. OpenWeather and Agromonitoring are separate live-monitoring integrations in the deployed dashboard. Their responses are not included in this NASA POWER analysis or these reports; access to historical records depends on each account and endpoint.\n")
     (out / "LIMITATIONS_AND_FURTHER_VALIDATION.md").write_text("\n".join(L))
 
     bad_chars = []
