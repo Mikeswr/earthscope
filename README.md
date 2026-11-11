@@ -7,6 +7,21 @@ EarthScope combines long-term climate analysis from NASA POWER with separate liv
 **Public dashboard:** https://earthscope.streamlit.app/  
 **Repository:** https://github.com/Mikeswr/earthscope
 
+## Who EarthScope is for
+
+EarthScope is designed for two connected audiences:
+
+- **The general public:** people who want to understand environmental change without needing a climate-science background. Plain-language explanations help visitors distinguish daily weather, natural variability and long-term trends.
+- **People working with environmental evidence:** researchers, solar energy professionals, planners, policymakers and environmental organisations who need location-specific measurements, statistical evidence and transparent methods.
+
+The platform presents the same underlying evidence to both audiences. Public-facing explanations make the results easier to understand, while the detailed methods, data-quality information and limitations remain available for technical review.
+
+## A featured finding: surface solar energy at Accra
+
+NASA POWER monthly gridded estimates indicate a statistically significant declining trend in estimated all-sky surface shortwave solar energy at the Accra grid point from 1984 to 2025. The estimated Sen's slope is **−0.0514 kWh/m²/day per decade** (95% confidence interval: **−0.0716 to −0.0285**; FDR-adjusted p-value: **0.0008**).
+
+This is a finding about estimated solar energy reaching the surface. It is not a measurement of solar-panel electricity generation, does not establish the physical cause of the decline, and requires independent validation against ground-based radiation measurements. It is presented as a signal worth investigating for solar resource assessment and energy planning, not as a direct prediction of energy output.
+
 ## What it does
 
 - Explore monthly environmental variables for Accra, Kumasi, Tamale, Wa and Takoradi.
