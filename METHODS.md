@@ -71,3 +71,31 @@ The current dashboard map displays trend markers at the five configured location
 - The annual autocorrelation adjustment is approximate.
 - Seasonal p-values are not used for significance claims.
 - Statistical significance does not establish a physical cause.
+
+## 11. Experimental monthly forecasting
+
+The dashboard's Future Outlook module provides statistical forecasts for an individual NASA POWER location-variable monthly series. It is deliberately separate from the historical Mann-Kendall trend analysis and from the live OpenWeather and Agromonitoring panels.
+
+### Candidate methods
+
+Three candidates are compared:
+
+- Seasonal-naive: repeats the last observed 12-month seasonal cycle.
+- Trend-seasonal regression: ordinary least squares linear time trend plus calendar-month fixed effects.
+- Damped additive exponential smoothing: additive trend and additive 12-month seasonality with a damped trend component.
+
+The selected candidate is the one with the lowest pooled mean absolute error across the rolling-origin backtests. The seasonal-naive method is retained as the required baseline. The dashboard reports MAE, RMSE, bias, number of withheld months, number of origins and skill relative to the baseline. A complex model is not described as an improvement if it does not beat the baseline.
+
+### Backtesting and data requirements
+
+The default evaluation uses five expanding-window origins, spaced 12 months apart. At each origin, the model is fitted only to observations available at that time and predicts the following 12 months. At least three valid origins are required. The training series must contain at least 120 consecutive valid monthly observations. Missing internal months cause forecasting to stop rather than being interpolated. Leading missing values are excluded, which permits the solar series to begin at its first valid month.
+
+### Forecast intervals and horizon
+
+The default forecast horizon is 24 months, with selectable horizons up to 60 months. Approximate 80% and 95% bands are calibrated from the empirical absolute errors of the selected model's withheld 12-month predictions. Band widths are expanded with the square root of lead time beyond 12 months. These are empirical statistical error bands, not formal probabilistic climate projection intervals. They assume that historical forecast errors remain informative and do not capture structural changes, future emissions, policy, land-use changes or climate-model scenario uncertainty.
+
+Basic physical bounds are applied to precipitation, relative humidity, wind speed and downward shortwave radiation. Such clipping is a presentation safeguard and does not validate the forecast distribution.
+
+### Interpretation and status
+
+Forecasts are experimental outlooks for five NASA POWER grid-cell time series, not Ghana-wide climate projections. The model comparison and forecast outputs must be checked by running the automated tests and inspecting backtest diagnostics on the supplied real dataset before communicating any substantive future result. Forecasts are not mixed into the historical trend significance calculations. The current module does not use OpenWeather or Agromonitoring observations as training data.
