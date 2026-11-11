@@ -13,6 +13,7 @@ EarthScope combines long-term climate analysis from NASA POWER with separate liv
 - Examine the 1981–2025 NASA POWER record for seven variables: T2M, T2M_MAX, T2M_MIN, PRECTOTCORR, RH2M, WS10M and ALLSKY_SFC_SW_DWN.
 - Compare annual series, anomalies, quality-control flags, trend estimates and evidence classes.
 - View point-level trend comparisons on a map.
+- Explore a separate Future Outlook module with rolling-origin model comparison, monthly forecasts and empirical uncertainty bands.
 - Check current weather through OpenWeather and Agromonitoring, with recent hourly history where the configured account permits it.
 
 ## Data sources and interpretation
@@ -60,6 +61,12 @@ The detailed method specification is available in [METHODS.md](METHODS.md).\n\n#
 - Seasonal Mann-Kendall results are calculated for diagnostics but are not used to make significance claims because between-month dependence is not corrected.
 - Sensitivity runs examine alternative autocorrelation correction, FDR method, annual aggregation, common-period coverage and precipitation extremes.
 
+## Future outlook
+
+The dashboard includes an experimental statistical forecasting module for the selected NASA POWER location and variable. It compares seasonal-naive, linear trend plus calendar-month effects, and damped additive exponential-smoothing candidates using rolling-origin 12-month backtests. The candidate with the lowest pooled mean absolute error is selected. Approximate 80% and 95% empirical error bands are calibrated from withheld backtest errors and widened with forecast lead time. The forecast horizon is 1–5 years.
+
+Forecasts require at least 10 years of consecutive valid monthly observations. Missing months are not interpolated. Forecast skill is reported against the seasonal-naive baseline. If a more complex model does not improve on the baseline, the dashboard says so. These are statistical extrapolations, not scenario-based climate projections. Their uncertainty bands do not capture future emissions, policy, land-use or climate-model scenario uncertainty. They must not be interpreted as guaranteed future conditions.
+
 ## Outputs\n\nThe repository includes the standardised monthly dataset, its provenance metadata, trend results and monthly anomaly table under data/processed/. The four narrative reports are stored at the repository root. The analysis scripts can regenerate report files and machine-readable tables in a local reports/ output directory. Raw NASA POWER downloads are not included in the repository.\n\n## Current status
 
 **Implemented and previously run on the five supplied NASA POWER files:** file validation, import, quality control, trend analysis, sensitivity analysis, figures and report generation.
@@ -68,7 +75,7 @@ The detailed method specification is available in [METHODS.md](METHODS.md).\n\n#
 
 **Not yet independently validated:** agreement between NASA POWER estimates and ground station observations; the physical interpretation of the observed solar-radiation decline; precipitation extremes and change points.
 
-**Not implemented:** continuous gridded spatial trend maps from a multi-year raster dataset; a dependence-corrected seasonal significance test; independent station validation; final Space Apps submission materials.
+**Not implemented:** continuous gridded spatial trend maps from a multi-year raster dataset; a dependence-corrected seasonal significance test; independent station validation; final Space Apps submission materials. Forecast skill and interval calibration have not yet been independently executed against the live dashboard dataset after this module was added.
 
 ## Reproducibility and tests
 
