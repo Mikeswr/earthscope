@@ -48,7 +48,7 @@ With downloaded NASA POWER files:
 5. python scripts/make_reports.py generates Markdown reports from the analysis tables.
 6. streamlit run dashboard/app.py launches the dashboard locally.
 
-With internet access, scripts/fetch_power.py can download NASA POWER data. See the script help for options.
+With internet access, scripts/fetch_power.py can download NASA POWER data. See the script help for options. The generated reports and tables are written to the selected output directory, which defaults to a local reports/ folder.
 
 ## Statistical approach
 
@@ -60,7 +60,7 @@ With internet access, scripts/fetch_power.py can download NASA POWER data. See t
 - Seasonal Mann-Kendall results are calculated for diagnostics but are not used to make significance claims because between-month dependence is not corrected.
 - Sensitivity runs examine alternative autocorrelation correction, FDR method, annual aggregation, common-period coverage and precipitation extremes.
 
-## Current status
+## Outputs\n\nThe repository includes the standardised monthly dataset, its provenance metadata, trend results and monthly anomaly table under data/processed/. The four narrative reports are stored at the repository root. The analysis scripts can regenerate report files and machine-readable tables in a local reports/ output directory. Raw NASA POWER downloads are not included in the repository.\n\n## Current status
 
 **Implemented and previously run on the five supplied NASA POWER files:** file validation, import, quality control, trend analysis, sensitivity analysis, figures and report generation.
 
