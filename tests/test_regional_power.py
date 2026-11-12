@@ -62,7 +62,7 @@ def test_request_is_one_parameter_and_uses_regional_bounds():
 
 def test_parse_geojson_cells_months_and_fill_values():
     frame = parse_regional_payload(payload(), "T2M", "test-tile")
-    assert len(frame) == 3
+    assert len(frame) == 4
     assert set(frame["cell_id"]) == {"6.0000_-1.0000", "6.0000_-0.5000"}
     assert pd.Timestamp("2024-01-01") in set(frame["date"])
     assert frame.loc[(frame["longitude"] == -0.5) & (frame["date"].dt.month == 2), "value"].isna().all()
