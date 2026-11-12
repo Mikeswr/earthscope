@@ -56,13 +56,10 @@ Automated tests also use mocked GeoJSON fixtures. They verify tiling, parsing,
 missing-value handling, coordinate preservation, per-cell summaries, trend
 statistics, and map legends.
 
-Before enabling a public map, run the downloader for a short period (for example
-2020–2021) and inspect:
-1. HTTP success and response structure for every parameter.
-2. Actual feature count and coordinates per tile.
-3. Duplicate coordinates at tile boundaries.
-4. Unit metadata and fill values.
-5. Native grid spacing against NASA's current product documentation.
+Before treating the full historical grid as validated, fetch the complete requested
+period and inspect coverage, missing values, units, cell counts and duplicate
+coordinates at tile boundaries. The current live smoke test confirms endpoint
+access and response parsing for a two-year sample, not every year of the archive.
 
 NASA POWER regional grid values are gridded estimates, not direct weather
 station observations. They are not sufficiently detailed to represent
@@ -79,9 +76,9 @@ period, then caches the result for seven days. It offers:
 - Per-cell annual Mann–Kendall and Sen's slope results, with AR(1) effective
   sample-size correction and Benjamini–Hochberg FDR adjustment across cells.
 - A map legend and cell-level tooltips.
-- Optional Ghana ADM2 boundaries for geographic context.
+- Ghana ADM2 boundaries to retain cell centres inside the national boundary and clip approximate cell footprints.
 
 Cell rectangles are approximate display footprints inferred from returned
-cell-centre spacing. They are not official NASA cell polygons. The dashboard
-does not interpolate between cells or treat an administrative district as
-the measurement unit.
+cell-centre spacing and clipped to Ghana administrative boundaries. They are
+not official NASA cell polygons. The dashboard does not interpolate between
+cells or treat an administrative district as the measurement unit.
