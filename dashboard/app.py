@@ -337,7 +337,10 @@ try:
         _map_location = _map_points[0].get("id")
         if not _map_location:
             _map_custom = _map_points[0].get("customdata")
-            _map_location = _map_custom[0] if isinstance(_map_custom, (list, tuple)) and len(_map_custom) > 3 else None
+            if isinstance(_map_custom, (list, tuple)) and len(_map_custom) > 1:
+                _map_location = _map_custom[1]
+            elif isinstance(_map_custom, str):
+                _map_location = _map_custom
         if _map_location in df["location"].unique():
             st.session_state["study_location"] = _map_location
 except (AttributeError, KeyError, TypeError, IndexError):
@@ -646,6 +649,44 @@ overview_fig.update_layout(
 )
 st.plotly_chart(overview_fig, width="stretch")
 st.caption("The dashed line is the Sen trend estimated over the full analysis period. Changing the chart window does not recalculate statistical significance.")
+
+# Plain-language interpretation of the selected, FDR-adjusted trend result.
+st.markdown("#### What does this result tell us?")
+trend_class = str(row.get("evidence_class", "insufficient_data"))
+trend_direction = str(row.get("mk_trend", "no trend"))
+slope = row.get("sen_per_decade", np.nan)
+ci_low = row.get("sen_ci_low_per_decade", np.nan)
+ci_high = row.get("sen_ci_high_per_decade", np.nan)
+analysis_start = int(row["first_year"]) if pd.notna(row.get("first_year", np.nan)) else "unknown"
+analysis_end = int(row["last_year"]) if pd.notna(row.get("last_year", np.nan)) else "unknown"
+if trend_class == "significant_after_fdr" and pd.notna(slope):
+    interpretation = (
+        f"Across {analysis_start}–{analysis_end}, {name(var).lower()} at the {loc} NASA POWER grid cell "
+        f"shows a statistically significant {trend_direction} trend of about {abs(slope):.3f} {unit} per decade. "
+        "This result remains significant after false-discovery-rate correction."
+    )
+    if pd.notna(ci_low) and pd.notna(ci_high):
+        interpretation += f" The Sen-slope 95% confidence interval is {ci_low:.3f} to {ci_high:.3f} {unit} per decade."
+    st.success(interpretation)
+elif trend_class == "significant_before_fdr_only" and pd.notna(slope):
+    st.warning(
+        f"A {trend_direction} trend of about {abs(slope):.3f} {unit} per decade was detected at {loc}, "
+        "but it did not remain statistically significant after false-discovery-rate correction. "
+        "Treat this as a weaker signal requiring further investigation."
+    )
+elif trend_class == "not_significant":
+    st.info(
+        f"The analysis did not find a statistically significant monotonic trend in {name(var).lower()} "
+        f"at {loc} after multiple-testing correction. This does not prove that conditions were unchanged."
+    )
+else:
+    st.info(
+        f"There is insufficient valid evidence to classify a long-term trend for {name(var).lower()} at {loc}."
+    )
+st.caption(
+    "These are trends in NASA POWER gridded estimates, not direct station observations. "
+    "Statistical association does not establish the cause of environmental change."
+)
 
 ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
