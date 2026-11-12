@@ -105,13 +105,14 @@ def point_trend_map(trends, variable):
             continue
         fig.add_trace(go.Scattergeo(
             lat=s["latitude"], lon=s["longitude"], mode="markers+text", text=s["location"],
+            ids=s["location"].astype(str),
             textposition="top center", name=label,
             marker=dict(size=16, symbol=symbol, color=s["sen_per_decade"], cmin=-lim, cmax=lim,
                         colorscale="RdBu_r", line=dict(width=2, color="#333"),
                         colorbar=dict(title=f"{unit}/decade") if first else None, showscale=first),
-            customdata=np.column_stack([s["location"].astype(str), s["sen_per_decade"], s["mk_p"], s["mk_p_fdr"]]),
-            hovertemplate=("%{text}<br>Sen slope %{customdata[1]:.3f} per decade"
-                           "<br>p uncorrected %{customdata[2]:.3f}<br>p FDR %{customdata[3]:.3f}"
+            customdata=np.column_stack([s["sen_per_decade"], s["mk_p"], s["mk_p_fdr"]]),
+            hovertemplate=("%{text}<br>Sen slope %{customdata[0]:.3f} per decade"
+                           "<br>p uncorrected %{customdata[1]:.3f}<br>p FDR %{customdata[2]:.3f}"
                            "<br><i>Select point to explore location</i><extra></extra>")))
         first = False
     fig.update_geos(
