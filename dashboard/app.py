@@ -5,6 +5,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import requests
+from shapely.geometry import Point, shape
 import streamlit as st
 from earthscope import config
 from earthscope.dashboard.data import load_data
@@ -178,6 +180,98 @@ div[data-testid="stPlotlyChart"]{width:100%;min-width:0}
 
 </style>
 """, unsafe_allow_html=True)
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_ghana_district_geojson():
+    """Load the open 2019 Ghana ADM2 boundaries from geoBoundaries (CC BY 4.0)."""
+    metadata_url = "https://www.geoboundaries.org/api/current/gbOpen/GHA/ADM2/"
+    metadata_response = requests.get(metadata_url, timeout=30)
+    metadata_response.raise_for_status()
+    metadata = metadata_response.json()
+    download_url = metadata.get("simplifiedGeometryGeoJSON") or metadata["gjDownloadURL"]
+    if "github.com/wmgeolab/geoBoundaries/raw/" in download_url:
+        download_url = download_url.replace(
+            "https://github.com/wmgeolab/geoBoundaries/raw/",
+            "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/",
+        )
+    boundary_response = requests.get(download_url, timeout=60)
+    boundary_response.raise_for_status()
+    boundary_data = boundary_response.json()
+    if boundary_data.get("type") != "FeatureCollection" or not boundary_data.get("features"):
+        raise ValueError("The Ghana administrative boundary file was not a valid GeoJSON FeatureCollection.")
+    return boundary_data, metadata
+
+
+def build_location_boundary_map(trends, variable, selected_location):
+    """Map real Ghana ADM2 polygons and link polygons containing study points."""
+    geojson, metadata = load_ghana_district_geojson()
+    points = trends[trends["variable"] == variable].dropna(subset=["latitude", "longitude"]).copy()
+    features, city_by_feature = [], {}
+    selected_district_id, selected_bounds = None, None
+    for idx, feature in enumerate(geojson["features"]):
+        properties = feature.get("properties") or {}
+        district_name = (properties.get("shapeName") or properties.get("shapeName_en")
+                         or properties.get("name") or f"District {idx + 1}")
+        geometry = shape(feature["geometry"])
+        matched_locations = []
+        for _, point_row in points.iterrows():
+            point = Point(float(point_row["longitude"]), float(point_row["latitude"]))
+            if geometry.covers(point):
+                matched_locations.append(str(point_row["location"]))
+        feature_id = str(idx)
+        props = dict(properties)
+        props.update({"_earthscope_id": feature_id, "_earthscope_name": district_name,
+                      "_earthscope_location": matched_locations[0] if matched_locations else ""})
+        features.append({"type": "Feature", "id": feature_id,
+                         "properties": props, "geometry": feature["geometry"]})
+        city_by_feature[feature_id] = (district_name, matched_locations[0] if matched_locations else "")
+        if selected_location in matched_locations:
+            selected_district_id, selected_bounds = feature_id, geometry.bounds
+
+    if selected_location and selected_district_id is None:
+        raise ValueError(f"No ADM2 polygon contains the configured {selected_location} NASA POWER point.")
+
+    customdata = [[city_by_feature[f["id"]][0], city_by_feature[f["id"]][1]] for f in features]
+    fig = go.Figure(go.Choropleth(
+        geojson={"type": "FeatureCollection", "features": features},
+        locations=[f["id"] for f in features],
+        z=[1 if f["id"] == selected_district_id else 0 for f in features],
+        featureidkey="id", customdata=customdata,
+        colorscale=[[0, "#E5ECE9"], [0.999, "#E5ECE9"], [1, "#1C7293"]],
+        zmin=0, zmax=1, showscale=False,
+        marker_line_color="#849A93", marker_line_width=0.65,
+        hovertemplate="<b>%{customdata[0]}</b><br>Study location: %{customdata[1]}<br>Click to select this study area<extra></extra>",
+        name="Ghana administrative districts",
+    ))
+    if selected_bounds:
+        minx, miny, maxx, maxy = selected_bounds
+        center = dict(lon=(minx + maxx) / 2, lat=(miny + maxy) / 2)
+        span = max(maxx - minx, maxy - miny, 0.08)
+        zoom_scale = float(np.clip(7.5 * (8.0 / span), 18, 170))
+    else:
+        center, zoom_scale = dict(lon=-1.5, lat=8.0), 7.5
+    fig.add_trace(go.Scattergeo(
+        lon=points["longitude"], lat=points["latitude"],
+        text=points["location"], ids=points["location"].astype(str),
+        customdata=points["location"].astype(str),
+        mode="markers+text", textposition="top center",
+        marker=dict(size=11, color="#D97736", line=dict(width=1.5, color="#FFFFFF")),
+        name="NASA POWER study points",
+        hovertemplate="<b>%{text}</b><br>NASA POWER grid-cell point<br>Click to select<extra></extra>",
+    ))
+    fig.update_geos(
+        scope="africa", showcountries=True, showland=True, landcolor="#F7F8F6",
+        showocean=True, oceancolor="#DCE8E8", showcoastlines=True,
+        coastlinecolor="#A9B8B7", center=center,
+        projection=dict(type="mercator", scale=zoom_scale), fitbounds=False,
+    )
+    fig.update_layout(
+        height=470, margin=dict(l=0, r=0, t=8, b=0),
+        paper_bgcolor="white", plot_bgcolor="white", font=dict(color="#203744"),
+        legend=dict(orientation="h", y=-0.06, x=0.02), clickmode="event+select",
+    )
+    return fig, metadata
+
 
 INFO = {
 "T2M":("Air temperature at 2 metres","Average air temperature about 2 metres above the surface.","°C"),
@@ -469,13 +563,47 @@ with overview_middle:
 
 with overview_map:
     st.markdown("#### Ghana study locations")
-    map_event = st.plotly_chart(
-        point_trend_map(trends, var), width="stretch",
-        config={"displayModeBar": False},
-        on_select="rerun", selection_mode="points",
-        key="overview_location_map"
-    )
-    st.caption("Select a point to update the dashboard. Markers show point-level trend estimates, not a continuous Ghana-wide field.")
+    try:
+        boundary_fig, boundary_metadata = build_location_boundary_map(trends, var, loc)
+        map_event = st.plotly_chart(
+            boundary_fig, width="stretch",
+            config={"displayModeBar": False},
+            on_select="rerun", selection_mode="points",
+            key="overview_location_map"
+        )
+        st.caption(
+            f"Selected area: the 2019 administrative district containing the {loc} NASA POWER point. "
+            "The highlighted district is geographic context, not the spatial footprint of the NASA grid cell."
+        )
+        st.caption(
+            f"Boundary source: geoBoundaries {boundary_metadata.get('boundaryYearRepresented', '2019')} "
+            f"ADM2 · {boundary_metadata.get('boundaryLicense', 'CC BY 4.0')}."
+        )
+        try:
+            selected_points = map_event.selection.points
+            if selected_points:
+                selected_point = selected_points[0]
+                selected_id = selected_point.get("id")
+                selected_custom = selected_point.get("customdata")
+                selected_map_location = selected_id
+                if selected_map_location not in df["location"].unique():
+                    if isinstance(selected_custom, (list, tuple)) and len(selected_custom) > 1:
+                        selected_map_location = selected_custom[1]
+                    elif isinstance(selected_custom, str):
+                        selected_map_location = selected_custom
+                if selected_map_location in df["location"].unique() and selected_map_location != loc:
+                    st.session_state["study_location"] = selected_map_location
+                    st.rerun()
+        except (AttributeError, KeyError, TypeError, IndexError):
+            pass
+    except Exception as boundary_error:
+        st.warning(
+            "Administrative boundaries could not be loaded. Showing the study-point map instead. "
+            f"Details: {boundary_error}"
+        )
+        st.plotly_chart(point_trend_map(trends, var), width="stretch",
+                        config={"displayModeBar": False})
+        st.caption("Fallback map shows NASA POWER study points only, not administrative boundaries.")
 
 st.markdown("#### Historical change over time")
 st.caption(f"{loc} · {name(var)} · displayed period {display_start}–{display_end}")
