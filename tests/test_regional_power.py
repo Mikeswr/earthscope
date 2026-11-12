@@ -48,7 +48,9 @@ def test_build_tiles_reject_invalid_bbox_and_oversized_span():
     with pytest.raises(ValueError):
         build_tiles((2, 5, 1, 10))
     with pytest.raises(ValueError):
-        build_tiles(max_span=5)
+        build_tiles(max_span=5.1)
+    with pytest.raises(ValueError, match="2-degree longitude"):
+        build_tiles((-1.0, 5.0, 0.5, 10.0))
 
 
 def test_request_is_one_parameter_and_uses_regional_bounds():
