@@ -24,7 +24,7 @@ jobs:
           python -m pip install pandas numpy requests pyyaml python-dotenv
       - name: Fetch a short real NASA POWER regional sample
         run: |
-          python -m scripts.fetch_power_regional --variables T2M --start 2020 --end 2021 --output-dir /tmp/earthscope-regional-smoke
+          python -m scripts.fetch_power_regional --variables T2M,T2M_MAX,T2M_MIN,PRECTOTCORR,RH2M,WS10M,ALLSKY_SFC_SW_DWN --start 2020 --end 2021 --output-dir /tmp/earthscope-regional-smoke
       - name: Validate real regional sample
         run: |
           python - <<'PY'
@@ -33,21 +33,24 @@ jobs:
           import pandas as pd
 
           root = Path("/tmp/earthscope-regional-smoke")
-          csv_path = root / "ghana_power_regional_T2M.csv"
           meta_path = root / "fetch_metadata.json"
-          assert csv_path.exists(), "Regional CSV was not created"
           assert meta_path.exists(), "Fetch metadata was not created"
-          frame = pd.read_csv(csv_path)
-          required = {"date", "variable", "value", "latitude", "longitude", "cell_id", "unit", "source", "data_kind"}
-          assert required.issubset(frame.columns), f"Missing columns: {required - set(frame.columns)}"
-          assert frame["cell_id"].nunique() > 1, "Regional request returned fewer than two unique grid cells"
-          assert frame["date"].notna().all(), "Missing dates in regional output"
-          assert frame["latitude"].between(4.7, 11.2).all(), "Latitude outside Ghana request bounds"
-          assert frame["longitude"].between(-3.3, 1.3).all(), "Longitude outside Ghana request bounds"
           metadata = json.loads(meta_path.read_text())
-          assert metadata["variables"]["T2M"]["request_count"] >= 1
-          print(f"Validated {len(frame):,} real monthly cell records across {frame.cell_id.nunique():,} cells.")
-          print(json.dumps(metadata["variables"]["T2M"]["grid_spacing"], indent=2))
+          variables = ["T2M", "T2M_MAX", "T2M_MIN", "PRECTOTCORR", "RH2M", "WS10M", "ALLSKY_SFC_SW_DWN"]
+          for variable in variables:
+              csv_path = root / f"ghana_power_regional_{variable}.csv"
+              assert csv_path.exists(), f"{variable}: regional CSV was not created"
+              frame = pd.read_csv(csv_path)
+              required = {"date", "variable", "value", "latitude", "longitude", "cell_id", "unit", "source", "data_kind"}
+              assert required.issubset(frame.columns), f"{variable}: missing columns {required - set(frame.columns)}"
+              assert frame["cell_id"].nunique() > 1, f"{variable}: fewer than two unique grid cells"
+              assert frame["date"].notna().all(), f"{variable}: missing dates"
+              assert frame["latitude"].between(4.7, 11.2).all(), f"{variable}: latitude outside Ghana bounds"
+              assert frame["longitude"].between(-3.3, 1.3).all(), f"{variable}: longitude outside Ghana bounds"
+              assert metadata["variables"][variable]["request_count"] >= 1
+              print(f"{variable}: {len(frame):,} records, {frame.cell_id.nunique():,} cells, "
+                    f"spacing={metadata['variables'][variable]['grid_spacing']}")
+          assert not metadata["failed_variables"], metadata["failed_variables"]
           PY
       - name: Upload smoke-test data and provenance
         uses: actions/upload-artifact@v4
