@@ -1,0 +1,132 @@
+"""Folium rendering for the native NASA POWER regional grid."""
+import html
+
+import folium
+import numpy as np
+import pandas as pd
+from branca.colormap import LinearColormap
+
+from spatial.analysis import cell_trend_table, grid_cell_bounds, period_cell_means
+
+EVIDENCE_COLORS = {
+    "significant_after_fdr_increasing": "#238B57",
+    "significant_after_fdr_decreasing": "#C84C4C",
+    "significant_before_fdr_only": "#D99B32",
+    "not_significant": "#89939A",
+    "insufficient_data": "#C7CDCF",
+}
+
+
+def _trend_colour(row):
+    evidence = row.get("evidence_class", "insufficient_data")
+    direction = row.get("trend", "no trend")
+    if evidence == "significant_after_fdr":
+        return EVIDENCE_COLORS[
+            "significant_after_fdr_increasing" if direction == "increasing"
+            else "significant_after_fdr_decreasing"
+        ]
+    return EVIDENCE_COLORS.get(evidence, EVIDENCE_COLORS["insufficient_data"])
+
+
+def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean value",
+                            boundary_geojson=None):
+    """Render cell-centre-derived rectangles with a map legend and per-cell tooltips.
+
+    Rectangle footprints are approximate display geometries derived from the
+    returned cell-centre spacing. They are not official NASA cell polygons.
+    """
+    if frame.empty:
+        raise ValueError("No regional grid data are available for this selection")
+    lat_step, lon_step = grid_cell_bounds(frame)
+    fmap = folium.Map(
+        location=[7.95, -1.05], zoom_start=6, tiles="OpenStreetMap",
+        control_scale=True, prefer_canvas=True,
+    )
+
+    if mode == "Mean value":
+        summary = period_cell_means(frame, start_year, end_year)
+        summary = summary[summary["mean_value"].notna()].copy()
+        if summary.empty:
+            raise ValueError("No valid values are available in the selected period")
+        vmin, vmax = float(summary["mean_value"].min()), float(summary["mean_value"].max())
+        if np.isclose(vmin, vmax):
+            vmax = vmin + max(abs(vmin) * 0.01, 0.01)
+        cmap = LinearColormap(
+            ["#440154", "#31688E", "#35B779", "#FDE725"],
+            vmin=vmin, vmax=vmax,
+        )
+        unit = summary["unit"].dropna().iloc[0] if summary["unit"].notna().any() else ""
+        cmap.caption = f"{variable} period mean ({unit})"
+        cmap.add_to(fmap)
+        for row in summary.itertuples(index=False):
+            colour = cmap(float(row.mean_value))
+            tooltip = (
+                f"<b>{html.escape(str(row.cell_id))}</b><br>"
+                f"Mean: {row.mean_value:.3f} {html.escape(str(row.unit or ''))}<br>"
+                f"Valid months: {int(row.n_months)}<br>"
+                f"Cell centre: {row.latitude:.3f}, {row.longitude:.3f}"
+            )
+            folium.Rectangle(
+                bounds=[
+                    [row.latitude - lat_step / 2, row.longitude - lon_step / 2],
+                    [row.latitude + lat_step / 2, row.longitude + lon_step / 2],
+                ],
+                color=colour, weight=0.55, fill=True, fill_color=colour,
+                fill_opacity=0.78, tooltip=folium.Tooltip(tooltip, sticky=True),
+            ).add_to(fmap)
+    elif mode == "Trend evidence":
+        summary = cell_trend_table(frame, variable)
+        if summary.empty:
+            raise ValueError("No cell-level trend results could be calculated")
+        for row in summary.itertuples(index=False):
+            colour = _trend_colour(row._asdict())
+            slope = "Not available" if pd.isna(row.sen_per_decade) else f"{row.sen_per_decade:.4f} {row.unit}/decade"
+            p_fdr = "Not available" if pd.isna(row.mk_p_fdr) else f"{row.mk_p_fdr:.4g}"
+            p_raw = "Not available" if pd.isna(row.mk_p) else f"{row.mk_p:.4g}"
+            tooltip = (
+                f"<b>{html.escape(str(row.cell_id))}</b><br>"
+                f"Trend: {html.escape(str(row.trend))}<br>"
+                f"Sen's slope: {html.escape(slope)}<br>"
+                f"FDR-adjusted p: {p_fdr}<br>Raw p: {p_raw}<br>"
+                f"Valid years: {int(row.n_years)}<br>"
+                f"Cell centre: {row.latitude:.3f}, {row.longitude:.3f}"
+            )
+            folium.Rectangle(
+                bounds=[
+                    [row.latitude - lat_step / 2, row.longitude - lon_step / 2],
+                    [row.latitude + lat_step / 2, row.longitude + lon_step / 2],
+                ],
+                color=colour, weight=0.55, fill=True, fill_color=colour,
+                fill_opacity=0.78, tooltip=folium.Tooltip(tooltip, sticky=True),
+            ).add_to(fmap)
+
+        legend = """
+        <div style="position:fixed;bottom:28px;left:18px;z-index:9999;background:#fff;
+                    padding:10px 12px;border:1px solid #9aa9a5;border-radius:7px;
+                    box-shadow:0 1px 5px rgba(0,0,0,.18);font-size:12px;color:#203744">
+          <b>Trend evidence</b><br>
+          <span style="color:#238B57">■</span> Increasing, significant after FDR<br>
+          <span style="color:#C84C4C">■</span> Decreasing, significant after FDR<br>
+          <span style="color:#D99B32">■</span> Raw p &lt; 0.05 only<br>
+          <span style="color:#89939A">■</span> Not significant<br>
+          <span style="color:#C7CDCF">■</span> Insufficient data
+        </div>
+        """
+        fmap.get_root().html.add_child(folium.Element(legend))
+    else:
+        raise ValueError("mode must be 'Mean value' or 'Trend evidence'")
+
+    if boundary_geojson:
+        folium.GeoJson(
+            boundary_geojson,
+            name="Ghana district boundaries",
+            style_function=lambda feature: {
+                "color": "#526875", "weight": 0.45, "fillOpacity": 0,
+            },
+            overlay=True,
+            control=True,
+        ).add_to(fmap)
+
+    fmap.fit_bounds([[4.5, -3.5], [11.4, 1.5]])
+    folium.LayerControl(collapsed=True).add_to(fmap)
+    return fmap, summary, (lat_step, lon_step)
