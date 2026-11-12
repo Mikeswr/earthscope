@@ -200,11 +200,15 @@ def load_ghana_district_geojson():
     if not download_url:
         raise ValueError("geoBoundaries metadata did not include a GeoJSON download URL.")
 
-    # Use the raw GitHub host. The API's github.com/raw link is an HTML redirect,
-    # which can return a web page instead of the GeoJSON in some hosted environments.
+    # geoBoundaries stores geometry files with Git LFS. raw.githubusercontent.com
+    # can return the small LFS pointer text file rather than the actual GeoJSON.
+    # media.githubusercontent.com serves the resolved LFS object.
     download_url = download_url.replace(
         "https://github.com/wmgeolab/geoBoundaries/raw/",
+        "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/",
+    ).replace(
         "https://raw.githubusercontent.com/wmgeolab/geoBoundaries/",
+        "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/",
     )
     boundary_response = requests.get(download_url, timeout=90)
     boundary_response.raise_for_status()
