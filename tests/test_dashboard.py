@@ -32,9 +32,9 @@ def test_synthetic_data_renders_with_warning(datadir):
     assert any("SYNTHETIC TEST DATA" in e.value for e in at.error)
     assert len(at.tabs) == 9
     for var in ["PRECTOTCORR", "RH2M", "T2M", "WS10M"]:
-        at.sidebar.selectbox[1].select(var).run()
+        at.selectbox[1].select(var).run()
         assert not at.exception, [e.value for e in at.exception]
-    at.sidebar.selectbox[0].select("Tamale").run()
+    at.selectbox[0].select("Tamale").run()
     assert not at.exception
 
 
