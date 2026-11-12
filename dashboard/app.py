@@ -19,6 +19,14 @@ from earthscope.ingest import openweather as owm
 from earthscope.ingest import agromonitoring as agro
 from earthscope.ingest import http as api_http
 from earthscope.forecasting.engine import ForecastError, forecast_monthly
+from spatial.power_regional import fetch_parameter
+from spatial.map import build_regional_grid_map
+
+@st.cache_data(ttl=7 * 24 * 60 * 60, show_spinner=False)
+def load_regional_grid_cached(variable, start_year, end_year):
+    """Cache a verified NASA POWER regional monthly grid by variable and period."""
+    return fetch_parameter(variable, start_year, end_year)
+
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
@@ -906,7 +914,7 @@ st.caption(
     "Statistical association does not establish the cause of environmental change."
 )
 
-ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
+ts,tr,fu,an,mp,qc,about,owtab,agtab,sptab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring","Spatial Explorer"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -1185,6 +1193,139 @@ with agtab:
                 st.warning(f"Agromonitoring historical response could not be parsed: {e}")
     with st.expander("How Agromonitoring data is used"):
         st.markdown("Agromonitoring weather is kept separate from NASA POWER and OpenWeather. It is not added to climate trend calculations. Temperature in the historical API is converted from Kelvin to Celsius by the ingestion parser.")
+
+
+with sptab:
+    st.markdown("### Explore Ghana's environmental grid")
+    st.write(
+        "Explore actual NASA POWER regional grid-cell estimates across Ghana. "
+        "This is separate from the five-location study and uses each variable's native grid."
+    )
+    spatial_variables = list(config.POWER_PARAMS)
+    spatial_variable = st.selectbox(
+        "Environmental variable",
+        spatial_variables,
+        format_func=lambda code: f"{config.VARIABLE_LABELS.get(code, code)} ({code})",
+        key="spatial_variable",
+    )
+    earliest_year = 1984 if spatial_variable == "ALLSKY_SFC_SW_DWN" else 1981
+    latest_year = config.latest_complete_year()
+    default_period = (earliest_year, latest_year)
+    spatial_period = st.slider(
+        "Analysis period",
+        min_value=earliest_year,
+        max_value=latest_year,
+        value=default_period,
+        step=1,
+        key=f"spatial_period_{spatial_variable}",
+    )
+    spatial_mode = st.radio(
+        "Map layer",
+        ["Mean value", "Trend evidence"],
+        horizontal=True,
+        key="spatial_map_mode",
+    )
+    spatial_key = (spatial_variable, int(spatial_period[0]), int(spatial_period[1]))
+    if st.button("Load / update Ghana grid", key="load_ghana_regional_grid"):
+        try:
+            with st.spinner(
+                f"Retrieving {spatial_variable} grid cells from NASA POWER for "
+                f"{spatial_period[0]}–{spatial_period[1]}..."
+            ):
+                spatial_frame = load_regional_grid_cached(*spatial_key)
+            st.session_state["spatial_grid_data"] = spatial_frame
+            st.session_state["spatial_grid_key"] = spatial_key
+            st.session_state["spatial_grid_error"] = None
+        except Exception as exc:
+            st.session_state["spatial_grid_error"] = str(exc)
+
+    if st.session_state.get("spatial_grid_error"):
+        st.error(f"Regional data could not be loaded: {st.session_state['spatial_grid_error']}")
+
+    spatial_frame = st.session_state.get("spatial_grid_data")
+    if spatial_frame is not None and st.session_state.get("spatial_grid_key") == spatial_key:
+        try:
+            boundary_geojson, boundary_metadata = load_ghana_district_geojson()
+        except Exception:
+            boundary_geojson, boundary_metadata = None, {}
+
+        try:
+            spatial_map, spatial_summary, spatial_spacing = build_regional_grid_map(
+                spatial_frame,
+                spatial_variable,
+                spatial_period[0],
+                spatial_period[1],
+                mode=spatial_mode,
+                boundary_geojson=boundary_geojson,
+            )
+            cell_count = int(spatial_frame["cell_id"].nunique())
+            record_count = int(len(spatial_frame))
+            metric_a, metric_b, metric_c = st.columns(3)
+            metric_a.metric("Grid cells returned", f"{cell_count:,}")
+            metric_b.metric("Monthly cell records", f"{record_count:,}")
+            metric_c.metric(
+                "Native grid spacing",
+                f"{spatial_spacing[0]:.3f}° × {spatial_spacing[1]:.3f}°",
+            )
+            st_folium(
+                spatial_map,
+                width=None,
+                height=610,
+                returned_objects=[],
+                key=f"earthscope_regional_grid_{spatial_variable}_{spatial_mode.replace(' ', '_')}",
+            )
+            if spatial_mode == "Mean value":
+                display_columns = [
+                    "cell_id", "latitude", "longitude", "mean_value", "n_months", "unit"
+                ]
+                st.markdown("#### Grid-cell summary")
+                st.dataframe(
+                    spatial_summary[display_columns].round(4),
+                    hide_index=True,
+                    width="stretch",
+                )
+            else:
+                display_columns = [
+                    "cell_id", "latitude", "longitude", "trend", "sen_per_decade",
+                    "mk_p", "mk_p_fdr", "evidence_class", "n_years",
+                ]
+                st.markdown("#### Cell-level trend statistics")
+                st.dataframe(
+                    spatial_summary[display_columns].round(4),
+                    hide_index=True,
+                    width="stretch",
+                )
+                st.caption(
+                    "Trend tests use annual values requiring all 12 months, the AR(1) effective-sample-size "
+                    "correction, and Benjamini–Hochberg false-discovery-rate adjustment across the returned "
+                    "grid cells for this variable."
+                )
+            st.caption(
+                "Grid-cell rectangles are approximate display footprints inferred from NASA's returned "
+                "cell-centre coordinates and their median spacing. They are not official cell-boundary "
+                "polygons. District boundaries provide geographic context only. No values are interpolated "
+                "between cells, and a grid cell does not represent a weather-station observation."
+            )
+            st.caption(
+                f"Source: NASA POWER regional monthly API. "
+                f"Boundary overlay: geoBoundaries ADM2 "
+                f"{boundary_metadata.get('boundaryYearRepresented', '2019')} where available."
+            )
+            st.download_button(
+                "Download spatial cell results (CSV)",
+                spatial_summary.to_csv(index=False),
+                file_name=f"earthscope_{spatial_variable}_{spatial_mode.lower().replace(' ', '_')}_cells.csv",
+                mime="text/csv",
+                key="download_spatial_cell_results",
+            )
+        except Exception as exc:
+            st.error(f"The spatial map could not be rendered safely: {exc}")
+    else:
+        st.info(
+            "Choose a variable and analysis period, then select **Load / update Ghana grid**. "
+            "EarthScope will retrieve the regional grid for that variable from NASA POWER. "
+            "The first request may take a little time. Results are cached for seven days."
+        )
 
 st.divider()
 st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
