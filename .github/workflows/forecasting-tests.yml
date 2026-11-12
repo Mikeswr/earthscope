@@ -4,15 +4,27 @@ on:
   push:
     paths:
       - "forecasting/**"
-      - "scripts/validate_forecasts.py"
-      - "tests/test_forecasting.py"
+      - "scripts/**"
+      - "tests/**"
+      - "dashboard/**"
+      - "ingest/**"
+      - "trends/**"
+      - "config.py"
+      - "locations.yaml"
+      - "requirements.txt"
       - "data/processed/power_monthly_standardised.csv"
       - ".github/workflows/forecasting-tests.yml"
   pull_request:
     paths:
       - "forecasting/**"
-      - "scripts/validate_forecasts.py"
-      - "tests/test_forecasting.py"
+      - "scripts/**"
+      - "tests/**"
+      - "dashboard/**"
+      - "ingest/**"
+      - "trends/**"
+      - "config.py"
+      - "locations.yaml"
+      - "requirements.txt"
       - "data/processed/power_monthly_standardised.csv"
       - ".github/workflows/forecasting-tests.yml"
   workflow_dispatch:
@@ -26,10 +38,14 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-      - name: Install forecasting dependencies
-        run: python -m pip install --upgrade pip numpy pandas scipy statsmodels pytest tabulate pyyaml python-dotenv
-      - name: Run forecasting unit tests
-        run: python -m pytest -q tests/test_forecasting.py
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt tabulate
+      - name: Compile dashboard Python files
+        run: python -m compileall -q dashboard
+      - name: Run complete test suite
+        run: python -m pytest -q
       - name: Run multi-horizon validation on committed NASA POWER data
         run: python scripts/validate_forecasts.py
       - name: Upload validation report and prediction diagnostics
