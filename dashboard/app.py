@@ -226,22 +226,38 @@ df,trends,anoms,meta=data["df"],data["trends"],data["anoms"],data["meta"]
 if (df["source"]=="SYNTHETIC TEST DATA").any():
     st.error("SYNTHETIC TEST DATA is loaded. Do not interpret or report these values.")
 
-st.sidebar.markdown("## Explore the data")
-st.sidebar.caption("Choose a location and environmental variable.")
-loc=st.sidebar.selectbox("Study location",sorted(df["location"].unique()))
-var=st.sidebar.selectbox("Environmental variable",sorted(df["variable"].unique()),format_func=lambda v:f"{name(v)} · {v}")
+st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation · Environmental change</div><h1>EarthScope</h1><p>Environmental change, made understandable. Explore what is changing, where it is happening, and what the evidence means.</p></div>',unsafe_allow_html=True)
+
+# Primary controls sit in the dashboard header, following the ArcGIS reference.
+control_location, control_variable, control_period = st.columns([1.0, 1.55, 1.0], gap="medium")
+with control_location:
+    loc = st.selectbox("Study location", sorted(df["location"].unique()), key="study_location")
+with control_variable:
+    var = st.selectbox("Environmental variable", sorted(df["variable"].unique()),
+                       format_func=lambda v: f"{name(v)} · {v}", key="study_variable")
+with control_period:
+    date_values = pd.to_datetime(df["date"], errors="coerce")
+    available_years = date_values.dropna().dt.year
+    min_available_year = int(available_years.min())
+    max_available_year = int(available_years.max())
+    display_years = st.slider("Chart period", min_value=min_available_year,
+                              max_value=max_available_year,
+                              value=(min_available_year, max_available_year),
+                              key="display_years")
+
 sel=df[(df.location==loc)&(df.variable==var)]
 unit=sel.unit.iat[0]
 row=trends[(trends.location==loc)&(trends.variable==var)].iloc[0]
+st.sidebar.markdown("## Current selection")
+st.sidebar.markdown(f"**{loc}**")
 st.sidebar.markdown(f"**{name(var)}**")
 st.sidebar.caption(f"NASA parameter: {var}")
 st.sidebar.write(desc(var))
 st.sidebar.caption(f"Source: {', '.join(sorted(sel.source.unique()))}")
 st.sidebar.caption(f"Data type: {', '.join(sorted(sel.data_kind.unique())).replace('_',' ')}")
+st.sidebar.caption(f"Chart display: {display_years[0]}–{display_years[1]}")
 if (df.unit_source!="response_metadata").any():
     st.sidebar.warning("Some units were assumed from documentation rather than read from source metadata.")
-
-st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation · Environmental change</div><h1>EarthScope</h1><p>Environmental change, made understandable. Explore what is changing, where it is happening, and what the evidence means.</p></div>',unsafe_allow_html=True)
 
 st.markdown("## Understand the change around you")
 st.markdown(
@@ -392,82 +408,96 @@ st.markdown("---")
 st.markdown("## Explore the environmental signal")
 st.caption("The panels below are linked to your selected location and NASA parameter.")
 
-overview_left, overview_middle, overview_map = st.columns([0.9, 1.15, 2.0], gap="small")
+overview_left, overview_middle, overview_map = st.columns([0.88, 1.18, 2.05], gap="small")
+display_start, display_end = display_years
+m_display = m[(m.index.year >= display_start) & (m.index.year <= display_end)]
+ann_display = ann[(ann.index >= display_start) & (ann.index <= display_end)]
 
 with overview_left:
-    st.markdown("#### Study snapshot")
-    st.metric("Valid annual observations", int(row["n_years"]) if pd.notna(row["n_years"]) else "n/a")
-    st.metric("Annual mean", f"{number(ann.mean(), 2)} {unit}" if len(ann) else "Not available")
-    st.metric("Trend estimate", f"{number(row['sen_per_decade'], 3)} {unit}/decade"
-              if pd.notna(row["sen_per_decade"]) else "Not available")
-    st.caption(f"{loc} · {var}")
-    st.caption("NASA POWER grid-cell estimates, not direct station measurements.")
+    st.markdown("#### Selected location")
+    st.markdown(f"### {loc}")
+    st.caption(f"{name(var)} · NASA parameter {var}")
+    st.metric("Annual observations", int(row["n_years"]) if pd.notna(row["n_years"]) else "n/a")
+    st.metric("Mean for displayed period", f"{number(ann_display.mean(), 2)} {unit}" if len(ann_display) else "Not available")
+    trend_value = row.get("sen_per_decade", np.nan)
+    st.metric("Long-term trend", f"{number(trend_value, 3)} {unit}/decade" if pd.notna(trend_value) else "Not available")
+    evidence_label = str(row.get("evidence_class", "insufficient_data")).replace("_", " ").title()
+    st.caption(f"Evidence: {evidence_label}")
+    if pd.notna(row.get("mk_p_fdr", np.nan)):
+        st.caption(f"FDR-adjusted p-value: {number(row['mk_p_fdr'], 4)}")
+    st.caption("Trend statistics use the full validated analysis period, not just the chart window.")
 
 with overview_middle:
     st.markdown("#### Seasonal pattern")
-    monthly_climatology = m.groupby(m.index.month).mean().reindex(range(1, 13))
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    monthly_climatology = m_display.groupby(m_display.index.month).mean().reindex(range(1, 13))
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     seasonal_fig = go.Figure(go.Scatter(
-        x=monthly_climatology.values,
-        y=month_names,
-        mode="lines+markers",
-        line=dict(color="#1C7293", width=3),
-        marker=dict(size=7),
+        x=monthly_climatology.values, y=month_names, mode="lines+markers",
+        line=dict(color="#1C7293", width=3), marker=dict(size=7),
         name="Monthly climatology",
         hovertemplate="%{y}: %{x:.2f} " + unit + "<extra></extra>"
     ))
     seasonal_fig.update_layout(
-        xaxis_title=unit, yaxis_title="", height=300,
+        xaxis_title=unit, yaxis_title="", height=350,
         margin=dict(l=5, r=12, t=12, b=35),
         plot_bgcolor="white", paper_bgcolor="white",
         font=dict(color="#203744"), showlegend=False
     )
     seasonal_fig.update_yaxes(autorange="reversed")
     st.plotly_chart(seasonal_fig, width="stretch", config={"displayModeBar": False})
-    st.caption("Average for each calendar month across the available historical record.")
+    st.caption(f"Monthly averages within {display_start}–{display_end}.")
 
 with overview_map:
-    st.markdown("#### Where are the study locations?")
-    st.plotly_chart(
-        point_trend_map(trends, var),
-        width="stretch",
-        config={"displayModeBar": False}
+    st.markdown("#### Ghana study locations")
+    map_event = st.plotly_chart(
+        point_trend_map(trends, var), width="stretch",
+        config={"displayModeBar": False},
+        on_select="rerun", selection_mode="points",
+        key="overview_location_map"
     )
-    st.caption("Five configured grid-cell locations. This is not a continuous map of Ghana-wide trends.")
+    try:
+        selected_points = map_event.selection.points
+        if selected_points:
+            selected_location = selected_points[0].get("customdata", [None])[0]
+            if selected_location in df["location"].unique() and selected_location != loc:
+                st.session_state["study_location"] = selected_location
+                st.rerun()
+    except (AttributeError, KeyError, TypeError, IndexError):
+        pass
+    st.caption("Select a point to update the dashboard. Markers show point-level trend estimates, not a continuous Ghana-wide field.")
 
 st.markdown("#### Historical change over time")
-st.caption("Monthly observations and annual summaries for the selected location and variable.")
+st.caption(f"{loc} · {name(var)} · displayed period {display_start}–{display_end}")
 overview_fig = go.Figure()
 overview_fig.add_trace(go.Scatter(
-    x=m.index, y=m.values, mode="lines", name="Monthly values",
+    x=m_display.index, y=m_display.values, mode="lines", name="Monthly values",
     line=dict(width=1.15, color="#1C7293")
 ))
-if len(ann):
+if len(ann_display):
     overview_fig.add_trace(go.Scatter(
-        x=[f"{y}-07-01" for y in ann.index], y=ann.values,
+        x=[f"{y}-07-01" for y in ann_display.index], y=ann_display.values,
         mode="markers", name="Annual summary",
         marker=dict(size=5, color="#D98C45")
     ))
-if pd.notna(row["sen_per_decade"]) and len(ann):
+if pd.notna(row["sen_per_decade"]) and len(ann_display):
     overview_slope = row["sen_per_decade"] / 10
     overview_intercept = float(np.median(ann.values - overview_slope * ann.index.values))
-    overview_years = np.array([ann.index.min(), ann.index.max()])
+    overview_years = np.array([ann_display.index.min(), ann_display.index.max()])
     overview_fig.add_trace(go.Scatter(
         x=[f"{y}-07-01" for y in overview_years],
         y=overview_intercept + overview_slope * overview_years,
-        mode="lines", name="Sen's slope",
+        mode="lines", name="Full-period Sen trend",
         line=dict(dash="dash", width=2.5, color="#C84C4C")
     ))
 overview_fig.update_layout(
     yaxis_title=f"{name(var)} ({unit})", xaxis_title="Year",
-    height=340, margin=dict(l=10, r=10, t=15, b=15),
+    height=390, margin=dict(l=10, r=10, t=15, b=15),
     legend=dict(orientation="h", y=-0.22),
     hovermode="x unified", plot_bgcolor="white", paper_bgcolor="white",
     font=dict(color="#203744")
 )
 st.plotly_chart(overview_fig, width="stretch")
-st.caption("The long-term trend is estimated statistically. Short-term fluctuations do not, by themselves, establish a climate trend.")
+st.caption("The dashed line is the Sen trend estimated over the full analysis period. Changing the chart window does not recalculate statistical significance.")
 
 ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
