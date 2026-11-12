@@ -69,7 +69,7 @@ def _add_grid_cell(fmap, row, colour, tooltip, lat_step, lon_step, country_geome
 
 def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean value",
                             boundary_geojson=None, focus_coordinates=None,
-                            selected_location=None, study_points=None):
+                            selected_location=None):
     """Render clipped native-grid footprints with a legend and per-cell tooltips.
 
     Footprints are approximations derived from returned cell-centre spacing.
