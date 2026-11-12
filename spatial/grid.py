@@ -109,11 +109,17 @@ def point_trend_map(trends, variable):
             marker=dict(size=16, symbol=symbol, color=s["sen_per_decade"], cmin=-lim, cmax=lim,
                         colorscale="RdBu_r", line=dict(width=2, color="#333"),
                         colorbar=dict(title=f"{unit}/decade") if first else None, showscale=first),
-            customdata=np.stack([s["sen_per_decade"], s["mk_p"], s["mk_p_fdr"]], axis=-1),
-            hovertemplate=("%{text}<br>Sen slope %{customdata[0]:.3f} per decade"
-                           "<br>p uncorrected %{customdata[1]:.3f}<br>p FDR %{customdata[2]:.3f}<extra></extra>")))
+            customdata=np.column_stack([s["location"].astype(str), s["sen_per_decade"], s["mk_p"], s["mk_p_fdr"]]),
+            hovertemplate=("%{text}<br>Sen slope %{customdata[1]:.3f} per decade"
+                           "<br>p uncorrected %{customdata[2]:.3f}<br>p FDR %{customdata[3]:.3f}"
+                           "<br><i>Select point to explore location</i><extra></extra>")))
         first = False
     fig.update_geos(fitbounds="locations", scope="africa", showcountries=True, resolution=50)
-    fig.update_layout(margin=dict(l=0, r=0, t=30, b=0), height=480,
-                      title=f"{variable}: Sen's slope per decade at configured locations")
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=28, b=0), height=430,
+        title=dict(text=f"{variable}: Sen's slope per decade", x=0.02, xanchor="left"),
+        paper_bgcolor="white", plot_bgcolor="white",
+        font=dict(color="#203744"),
+        legend=dict(orientation="h", y=-0.08, x=0.02),
+    )
     return fig
