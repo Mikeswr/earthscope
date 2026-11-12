@@ -383,18 +383,18 @@ def build_location_boundary_map(trends, variable, selected_location):
 
 
 def build_leaflet_location_map(trends, variable, selected_location, geojson):
-    """Build an OpenStreetMap/Leaflet map with clickable Ghana ADM2 polygons."""
+    """Build an OpenStreetMap map with district boundaries and mapped trend evidence."""
     points = trends[trends["variable"] == variable].dropna(subset=["latitude", "longitude"]).copy()
-    selected_feature = None
     features = geojson.get("features", [])
+    selected_feature = None
 
     for feature in features:
         props = feature.get("properties") or {}
         geom = shape(feature["geometry"])
-        matched = []
-        for _, row in points.iterrows():
-            if geom.covers(Point(float(row["longitude"]), float(row["latitude"]))):
-                matched.append(str(row["location"]))
+        matched = [
+            str(row["location"]) for _, row in points.iterrows()
+            if geom.covers(Point(float(row["longitude"]), float(row["latitude"])))
+        ]
         props["_earthscope_locations"] = matched
         props["_earthscope_location"] = matched[0] if matched else ""
         if selected_location in matched:
@@ -403,50 +403,91 @@ def build_leaflet_location_map(trends, variable, selected_location, geojson):
     if selected_feature is None:
         raise ValueError(f"No Ghana ADM2 boundary contains the {selected_location} study coordinate.")
 
-    selected_geom = shape(selected_feature["geometry"])
-    minx, miny, maxx, maxy = selected_geom.bounds
-    center = [(miny + maxy) / 2, (minx + maxx) / 2]
+    minx, miny, maxx, maxy = shape(selected_feature["geometry"]).bounds
     fmap = folium.Map(
-        location=center, zoom_start=9, tiles="OpenStreetMap",
-        control_scale=True, prefer_canvas=True,
+        location=[(miny + maxy) / 2, (minx + maxx) / 2],
+        zoom_start=9, tiles="OpenStreetMap", control_scale=True, prefer_canvas=True,
     )
 
     def district_style(feature):
-        matched = feature.get("properties", {}).get("_earthscope_locations", [])
-        is_selected = selected_location in matched
+        selected = selected_location in feature.get("properties", {}).get("_earthscope_locations", [])
         return {
-            "fillColor": "#1C7293" if is_selected else "#DCE8E5",
-            "color": "#174B60" if is_selected else "#718782",
-            "weight": 3 if is_selected else 1,
-            "fillOpacity": 0.48 if is_selected else 0.20,
+            "fillColor": "#1C7293" if selected else "#DCE8E5",
+            "color": "#174B60" if selected else "#718782",
+            "weight": 3 if selected else 1,
+            "fillOpacity": 0.48 if selected else 0.20,
         }
 
+    props0 = features[0].get("properties", {}) if features else {}
+    name_field = next((k for k in ("shapeName", "shapeName_en", "name") if k in props0), None)
     folium.GeoJson(
-        geojson,
-        name="Ghana district boundaries",
+        geojson, name="Ghana district boundaries",
         style_function=district_style,
-        highlight_function=lambda feature: {
-            "weight": 3, "color": "#D97736", "fillOpacity": 0.55
-        },
-        tooltip=folium.GeoJsonTooltip(
-            fields=["shapeName"] if features and "shapeName" in (features[0].get("properties") or {}) else [],
-            aliases=["District:"], sticky=True
-        ) if features and "shapeName" in (features[0].get("properties") or {}) else None,
-        popup=folium.GeoJsonPopup(
-            fields=["_earthscope_location"],
-            aliases=["EarthScope study location:"],
-            labels=True,
-        ),
+        highlight_function=lambda feature: {"weight": 3, "color": "#D97736", "fillOpacity": 0.55},
+        tooltip=folium.GeoJsonTooltip(fields=[name_field], aliases=["District:"], sticky=True) if name_field else None,
+        popup=folium.GeoJsonPopup(fields=["_earthscope_location"], aliases=["EarthScope study location:"], labels=True),
     ).add_to(fmap)
 
+    # Each circle represents one NASA POWER grid-cell trend result. No continuous surface is inferred.
+    colours = {
+        "increasing": "#16856B",
+        "decreasing": "#D45B4C",
+        "possible": "#D69A32",
+        "not_significant": "#87949B",
+    }
     for _, row in points.iterrows():
+        evidence = str(row.get("evidence_class", "insufficient_data")).lower()
+        direction = str(row.get("mk_trend", "no trend")).lower()
+        if evidence == "significant_after_fdr" and direction in ("increasing", "decreasing"):
+            category = direction
+        elif evidence == "significant_before_fdr_only":
+            category = "possible"
+        else:
+            category = "not_significant"
+
+        slope, low, high, p_fdr = (
+            row.get("sen_per_decade", np.nan),
+            row.get("sen_ci_low_per_decade", np.nan),
+            row.get("sen_ci_high_per_decade", np.nan),
+            row.get("mk_p_fdr", np.nan),
+        )
+        unit = str(row.get("unit", ""))
+        fmt = lambda value: f"{float(value):.4f}" if pd.notna(value) else "Not available"
+        popup = (
+            f"<b>{row['location']}</b><br><b>{variable}</b><br>"
+            f"Trend: {direction.title()}<br>"
+            f"Sen's slope: {fmt(slope)} {unit}/decade<br>"
+            f"95% CI: {fmt(low)} to {fmt(high)} {unit}/decade<br>"
+            f"FDR-adjusted p: {fmt(p_fdr)}<br>"
+            f"Evidence: {evidence.replace('_', ' ').title()}<br>"
+            "<small>NASA POWER grid-cell estimate, not a station observation.</small>"
+        )
+        selected = str(row["location"]) == selected_location
         folium.CircleMarker(
             location=[float(row["latitude"]), float(row["longitude"])],
-            radius=6, color="#FFFFFF", weight=2, fill=True,
-            fill_color="#D97736", fill_opacity=1,
-            tooltip=str(row["location"]),
+            radius=10 if selected else 7,
+            color="#E9A23B" if selected else "#173B4D",
+            weight=4 if selected else 2,
+            fill=True, fill_color=colours[category], fill_opacity=0.98,
+            tooltip=f"{row['location']} · {direction.title()}",
+            popup=folium.Popup(popup, max_width=310),
         ).add_to(fmap)
 
+    legend_html = """
+    <div style="position:fixed;right:14px;bottom:24px;z-index:9999;background:rgba(255,255,255,.97);
+    padding:11px 13px;border:1px solid #C9D6D1;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.18);
+    font:12px/1.5 Arial,sans-serif;color:#203744;max-width:255px">
+      <b>Selected variable · trend evidence</b>
+      <div><span style="color:#16856B">●</span> Increasing, significant after FDR</div>
+      <div><span style="color:#D45B4C">●</span> Decreasing, significant after FDR</div>
+      <div><span style="color:#D69A32">●</span> Possible signal, not significant after FDR</div>
+      <div><span style="color:#87949B">●</span> No significant trend / insufficient data</div>
+      <div style="border-top:1px solid #DCE5E1;margin-top:6px;padding-top:5px">
+        Gold outline = selected location. Click a point for slope, 95% CI and p-value.
+      </div>
+    </div>
+    """
+    fmap.get_root().html.add_child(folium.Element(legend_html))
     fmap.fit_bounds([[miny, minx], [maxy, maxx]], padding=(35, 35))
     folium.LayerControl(collapsed=True).add_to(fmap)
     return fmap
