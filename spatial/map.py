@@ -79,6 +79,9 @@ def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean va
     """
     if frame.empty:
         raise ValueError("No regional grid data are available for this selection")
+    # Infer the native grid spacing from all returned centres before filtering;
+    # a coastal/national subset may contain only one centre along one axis.
+    lat_step, lon_step = grid_cell_bounds(frame)
     country_geometry = _country_geometry(boundary_geojson)
     display_frame = (
         filter_cells_to_boundary(frame, boundary_geojson)
@@ -86,7 +89,6 @@ def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean va
     )
     if display_frame.empty:
         raise ValueError("No returned NASA POWER cell centres fall within the Ghana boundary")
-    lat_step, lon_step = grid_cell_bounds(display_frame)
     fmap = folium.Map(
         location=[7.95, -1.05], zoom_start=6, tiles="OpenStreetMap",
         control_scale=True, prefer_canvas=True,
