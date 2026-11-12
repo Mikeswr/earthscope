@@ -8,6 +8,8 @@ import plotly.graph_objects as go
 import requests
 from shapely.geometry import Point, shape
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 from earthscope import config
 from earthscope.dashboard.data import load_data
 from earthscope.qc import checks
@@ -380,6 +382,75 @@ def build_location_boundary_map(trends, variable, selected_location):
     return fig, metadata
 
 
+def build_leaflet_location_map(trends, variable, selected_location, geojson):
+    """Build an OpenStreetMap/Leaflet map with clickable Ghana ADM2 polygons."""
+    points = trends[trends["variable"] == variable].dropna(subset=["latitude", "longitude"]).copy()
+    selected_feature = None
+    features = geojson.get("features", [])
+
+    for feature in features:
+        props = feature.get("properties") or {}
+        geom = shape(feature["geometry"])
+        matched = []
+        for _, row in points.iterrows():
+            if geom.covers(Point(float(row["longitude"]), float(row["latitude"]))):
+                matched.append(str(row["location"]))
+        props["_earthscope_locations"] = matched
+        if selected_location in matched:
+            selected_feature = feature
+
+    if selected_feature is None:
+        raise ValueError(f"No Ghana ADM2 boundary contains the {selected_location} study coordinate.")
+
+    selected_geom = shape(selected_feature["geometry"])
+    minx, miny, maxx, maxy = selected_geom.bounds
+    center = [(miny + maxy) / 2, (minx + maxx) / 2]
+    fmap = folium.Map(
+        location=center, zoom_start=9, tiles="OpenStreetMap",
+        control_scale=True, prefer_canvas=True,
+    )
+
+    def district_style(feature):
+        matched = feature.get("properties", {}).get("_earthscope_locations", [])
+        is_selected = selected_location in matched
+        return {
+            "fillColor": "#1C7293" if is_selected else "#DCE8E5",
+            "color": "#174B60" if is_selected else "#718782",
+            "weight": 3 if is_selected else 1,
+            "fillOpacity": 0.48 if is_selected else 0.20,
+        }
+
+    folium.GeoJson(
+        geojson,
+        name="Ghana district boundaries",
+        style_function=district_style,
+        highlight_function=lambda feature: {
+            "weight": 3, "color": "#D97736", "fillOpacity": 0.55
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["shapeName"] if features and "shapeName" in (features[0].get("properties") or {}) else [],
+            aliases=["District:"], sticky=True
+        ) if features and "shapeName" in (features[0].get("properties") or {}) else None,
+        popup=folium.GeoJsonPopup(
+            fields=["_earthscope_locations"],
+            aliases=["EarthScope study location:"],
+            labels=True,
+        ),
+    ).add_to(fmap)
+
+    for _, row in points.iterrows():
+        folium.CircleMarker(
+            location=[float(row["latitude"]), float(row["longitude"])],
+            radius=6, color="#FFFFFF", weight=2, fill=True,
+            fill_color="#D97736", fill_opacity=1,
+            tooltip=str(row["location"]),
+        ).add_to(fmap)
+
+    fmap.fit_bounds([[miny, minx], [maxy, maxx]], padding=(35, 35))
+    folium.LayerControl(collapsed=True).add_to(fmap)
+    return fmap
+
+
 INFO = {
 "T2M":("Air temperature at 2 metres","Average air temperature about 2 metres above the surface.","°C"),
 "T2M_MAX":("Highest air temperature at 2 metres","Highest hourly air-temperature value within each month.","°C"),
@@ -674,45 +745,37 @@ with overview_middle:
 with overview_map:
     st.markdown("#### Ghana study locations")
     try:
-        boundary_fig, boundary_metadata = build_location_boundary_map(trends, var, loc)
-        map_event = st.plotly_chart(
-            boundary_fig, width="stretch",
-            config={"displayModeBar": False},
-            on_select="rerun", selection_mode="points",
-            key="overview_location_map"
+        boundary_geojson, boundary_metadata = load_ghana_district_geojson()
+        leaflet_map = build_leaflet_location_map(trends, var, loc, boundary_geojson)
+        map_event = st_folium(
+            leaflet_map, width=None, height=520, returned_objects=["last_active_drawing"],
+            key="earthscope_leaflet_location_map",
+        )
+        drawing = (map_event or {}).get("last_active_drawing") or {}
+        properties = drawing.get("properties") or {}
+        clicked_locations = properties.get("_earthscope_locations") or []
+        selected_from_map = next((x for x in clicked_locations if x in df["location"].unique()), None)
+        if selected_from_map and selected_from_map != loc:
+            st.session_state["study_location"] = selected_from_map
+            st.rerun()
+        st.caption(
+            f"Selected area: the administrative district containing the {loc} NASA POWER point. "
+            "District boundaries provide geographic context, not the footprint of the NASA grid cell."
         )
         st.caption(
-            f"Selected area: the 2019 administrative district containing the {loc} NASA POWER point. "
-            "The highlighted district is geographic context, not the spatial footprint of the NASA grid cell."
+            f"Map tiles: OpenStreetMap contributors. Boundaries: geoBoundaries "
+            f"{boundary_metadata.get('boundaryYearRepresented', '2019')} ADM2, "
+            f"{boundary_metadata.get('boundaryLicense', 'CC BY 4.0')}."
         )
-        st.caption(
-            f"Boundary source: geoBoundaries {boundary_metadata.get('boundaryYearRepresented', '2019')} "
-            f"ADM2 · {boundary_metadata.get('boundaryLicense', 'CC BY 4.0')}."
-        )
-        try:
-            selected_points = map_event.selection.points
-            if selected_points:
-                selected_point = selected_points[0]
-                selected_id = selected_point.get("id")
-                selected_custom = selected_point.get("customdata")
-                selected_map_location = selected_id
-                if selected_map_location not in df["location"].unique():
-                    if isinstance(selected_custom, (list, tuple)) and len(selected_custom) > 1:
-                        selected_map_location = selected_custom[1]
-                    elif isinstance(selected_custom, str):
-                        selected_map_location = selected_custom
-                if selected_map_location in df["location"].unique() and selected_map_location != loc:
-                    st.session_state["study_location"] = selected_map_location
-                    st.rerun()
-        except (AttributeError, KeyError, TypeError, IndexError):
-            pass
     except Exception as boundary_error:
         st.warning(
-            "Administrative boundaries could not be loaded. Showing the study-point map instead. "
+            "The interactive district map could not be loaded. "
             f"Details: {boundary_error}"
         )
-        st.plotly_chart(point_trend_map(trends, var), width="stretch",
-                        config={"displayModeBar": False})
+        st.plotly_chart(
+            point_trend_map(trends, var), width="stretch",
+            config={"displayModeBar": False}
+        )
         st.caption("Fallback map shows NASA POWER study points only, not administrative boundaries.")
 
 st.markdown("#### Historical change over time")
