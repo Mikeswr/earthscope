@@ -18,7 +18,7 @@ import requests
 from earthscope import config
 
 API_URL = "https://power.larc.nasa.gov/api/temporal/monthly/regional"
-MAX_TILE_SPAN_DEGREES = 4.0  # conservative, below the commonly documented 4.5-degree regional limit
+MAX_TILE_SPAN_DEGREES = 4.0  # balanced request tiles; regional API requires >=2 degrees longitude
 FILL_VALUE = -999.0
 COLUMNS = [
     "date", "variable", "value", "latitude", "longitude", "cell_id",
@@ -35,8 +35,13 @@ def build_tiles(bbox=None, max_span=MAX_TILE_SPAN_DEGREES):
     west, south, east, north = bbox or config.GHANA_BBOX
     if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
         raise ValueError("bbox must be (west, south, east, north) in valid geographic coordinates")
-    if not (0 < max_span <= 4.5):
-        raise ValueError("max_span must be greater than 0 and no more than 4.5 degrees")
+    if not (0 < max_span <= 5.0):
+        raise ValueError("max_span must be greater than 0 and no more than 5 degrees")
+    if east - west < 2.0:
+        raise ValueError(
+            "NASA POWER regional monthly requests require at least a 2-degree longitude range; "
+            "use the point endpoint for narrower areas."
+        )
     def split_axis(lower, upper):
         length = upper - lower
         count = max(1, int(math.ceil(length / max_span)))
