@@ -19,8 +19,8 @@ from earthscope.ingest import openweather as owm
 from earthscope.ingest import agromonitoring as agro
 from earthscope.ingest import http as api_http
 from earthscope.forecasting.engine import ForecastError, forecast_monthly
-from spatial.power_regional import fetch_parameter
-from spatial.map import build_regional_grid_map
+from earthscope.spatial.power_regional import fetch_parameter
+from earthscope.spatial.map import build_regional_grid_map
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
