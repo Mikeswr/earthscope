@@ -5,7 +5,7 @@ import folium
 import numpy as np
 import pandas as pd
 from branca.colormap import LinearColormap
-from shapely.geometry import box, mapping, shape
+from shapely.geometry import Point, box, mapping, shape
 from shapely.ops import unary_union
 
 from earthscope.spatial.analysis import (
@@ -68,7 +68,8 @@ def _add_grid_cell(fmap, row, colour, tooltip, lat_step, lon_step, country_geome
 
 
 def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean value",
-                            boundary_geojson=None):
+                            boundary_geojson=None, focus_coordinates=None,
+                            selected_location=None, study_points=None):
     """Render clipped native-grid footprints with a legend and per-cell tooltips.
 
     Footprints are approximations derived from returned cell-centre spacing.
@@ -89,8 +90,14 @@ def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean va
     )
     if display_frame.empty:
         raise ValueError("No returned NASA POWER cell centres fall within the Ghana boundary")
+    if focus_coordinates is not None:
+        map_center = [float(focus_coordinates[0]), float(focus_coordinates[1])]
+        map_zoom = 8
+    else:
+        map_center = [7.95, -1.05]
+        map_zoom = 6
     fmap = folium.Map(
-        location=[7.95, -1.05], zoom_start=6, tiles="OpenStreetMap",
+        location=map_center, zoom_start=map_zoom, tiles="OpenStreetMap",
         control_scale=True, prefer_canvas=True,
     )
 
@@ -158,16 +165,49 @@ def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean va
         raise ValueError("mode must be 'Mean value' or 'Trend evidence'")
 
     if boundary_geojson:
+        selected_geometry = None
+        if focus_coordinates is not None:
+            focus_point = Point(float(focus_coordinates[1]), float(focus_coordinates[0]))
+            for feature in boundary_geojson.get("features", []):
+                if feature.get("geometry") and shape(feature["geometry"]).covers(focus_point):
+                    selected_geometry = feature["geometry"]
+                    break
+
+        def boundary_style(feature):
+            is_selected = (
+                selected_geometry is not None
+                and feature.get("geometry") == selected_geometry
+            )
+            return {
+                "color": "#D97736" if is_selected else "#526875",
+                "weight": 2.8 if is_selected else 0.45,
+                "fillColor": "#D97736" if is_selected else "#FFFFFF",
+                "fillOpacity": 0.10 if is_selected else 0,
+            }
+
         folium.GeoJson(
             boundary_geojson,
             name="Ghana district boundaries",
-            style_function=lambda feature: {
-                "color": "#526875", "weight": 0.45, "fillOpacity": 0,
-            },
+            style_function=boundary_style,
             overlay=True,
             control=True,
         ).add_to(fmap)
 
-    fmap.fit_bounds([[4.5, -3.5], [11.4, 1.5]])
+    # Keep the selected NASA POWER location in the map as a reference only.
+    # The coloured grid cells remain the spatial data layer, not a marker surface.
+    if focus_coordinates is not None and selected_location:
+        folium.CircleMarker(
+            location=map_center,
+            radius=4,
+            color="#203744",
+            weight=1.2,
+            fill=True,
+            fill_color="#FFFFFF",
+            fill_opacity=1,
+            tooltip=f"{selected_location} reference grid-cell centre",
+        ).add_to(fmap)
+
+    if focus_coordinates is None:
+        fmap.fit_bounds([[4.5, -3.5], [11.4, 1.5]])
     folium.LayerControl(collapsed=True).add_to(fmap)
     return fmap, summary, (lat_step, lon_step)
