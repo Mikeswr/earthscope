@@ -183,24 +183,129 @@ div[data-testid="stPlotlyChart"]{width:100%;min-width:0}
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def load_ghana_district_geojson():
-    """Load the open 2019 Ghana ADM2 boundaries from geoBoundaries (CC BY 4.0)."""
+    """Load geoBoundaries Ghana ADM2 polygons with robust metadata and URL handling."""
     metadata_url = "https://www.geoboundaries.org/api/current/gbOpen/GHA/ADM2/"
-    metadata_response = requests.get(metadata_url, timeout=30)
-    metadata_response.raise_for_status()
-    metadata = metadata_response.json()
-    download_url = metadata.get("simplifiedGeometryGeoJSON") or metadata["gjDownloadURL"]
-    if "github.com/wmgeolab/geoBoundaries/raw/" in download_url:
-        download_url = download_url.replace(
-            "https://github.com/wmgeolab/geoBoundaries/raw/",
-            "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/",
-        )
-    boundary_response = requests.get(download_url, timeout=60)
+    response = requests.get(metadata_url, timeout=30)
+    response.raise_for_status()
+    metadata = response.json()
+    # geoBoundaries normally returns an object, but tolerate a one-item list response.
+    if isinstance(metadata, list):
+        if not metadata:
+            raise ValueError("geoBoundaries returned an empty metadata list.")
+        metadata = metadata[0]
+    if not isinstance(metadata, dict):
+        raise ValueError("geoBoundaries metadata was not a JSON object.")
+
+    download_url = metadata.get("simplifiedGeometryGeoJSON") or metadata.get("gjDownloadURL")
+    if not download_url:
+        raise ValueError("geoBoundaries metadata did not include a GeoJSON download URL.")
+
+    # Use the raw GitHub host. The API's github.com/raw link is an HTML redirect,
+    # which can return a web page instead of the GeoJSON in some hosted environments.
+    download_url = download_url.replace(
+        "https://github.com/wmgeolab/geoBoundaries/raw/",
+        "https://raw.githubusercontent.com/wmgeolab/geoBoundaries/",
+    )
+    boundary_response = requests.get(download_url, timeout=90)
     boundary_response.raise_for_status()
-    boundary_data = boundary_response.json()
+    try:
+        boundary_data = boundary_response.json()
+    except ValueError as exc:
+        raise ValueError(
+            f"Boundary download did not return JSON (content type: "
+            f"{boundary_response.headers.get('Content-Type', 'unknown')})."
+        ) from exc
+
     if boundary_data.get("type") != "FeatureCollection" or not boundary_data.get("features"):
         raise ValueError("The Ghana administrative boundary file was not a valid GeoJSON FeatureCollection.")
     return boundary_data, metadata
 
+
+def build_location_boundary_map(trends, variable, selected_location):
+    """Render all Ghana ADM2 districts and emphasize the district containing the selected point."""
+    geojson, metadata = load_ghana_district_geojson()
+    points = trends[trends["variable"] == variable].dropna(subset=["latitude", "longitude"]).copy()
+    features, district_lookup = [], {}
+    selected_district_id, selected_bounds = None, None
+
+    # Match the NASA POWER point to the actual district polygon.
+    for idx, feature in enumerate(geojson["features"]):
+        properties = feature.get("properties") or {}
+        district_name = (properties.get("shapeName") or properties.get("shapeName_en")
+                         or properties.get("name") or f"District {idx + 1}")
+        geometry = shape(feature["geometry"])
+        matched_locations = []
+        for _, point_row in points.iterrows():
+            point = Point(float(point_row["longitude"]), float(point_row["latitude"]))
+            if geometry.covers(point):
+                matched_locations.append(str(point_row["location"]))
+        feature_id = str(idx)
+        features.append({
+            "type": "Feature", "id": feature_id,
+            "properties": {**properties, "_earthscope_id": feature_id,
+                           "_earthscope_name": district_name,
+                           "_earthscope_locations": matched_locations},
+            "geometry": feature["geometry"],
+        })
+        district_lookup[feature_id] = (district_name, matched_locations, geometry.bounds)
+        if selected_location in matched_locations:
+            selected_district_id, selected_bounds = feature_id, geometry.bounds
+
+    if selected_district_id is None:
+        raise ValueError(
+            f"The {selected_location} NASA POWER coordinate did not fall inside a Ghana ADM2 polygon. "
+            "Check the coordinate reference and boundary dataset."
+        )
+
+    # Use a two-tone district fill so the selected district is visibly distinct.
+    z_values = [1 if feature["id"] == selected_district_id else 0 for feature in features]
+    customdata = [
+        [district_lookup[feature["id"]][0],
+         ", ".join(district_lookup[feature["id"]][1]) or "No configured study point"]
+        for feature in features
+    ]
+    fig = go.Figure(go.Choropleth(
+        geojson={"type": "FeatureCollection", "features": features},
+        locations=[feature["id"] for feature in features],
+        z=z_values, featureidkey="id", customdata=customdata,
+        colorscale=[[0, "#E7EFEC"], [0.49, "#E7EFEC"], [0.5, "#1C7293"], [1, "#1C7293"]],
+        zmin=0, zmax=1, showscale=False,
+        marker_line_color="#718782", marker_line_width=0.8,
+        hovertemplate="<b>%{customdata[0]}</b><br>Study point: %{customdata[1]}<extra></extra>",
+        name="2019 district boundaries",
+    ))
+
+    minx, miny, maxx, maxy = selected_bounds
+    center = dict(lon=(minx + maxx) / 2, lat=(miny + maxy) / 2)
+    span = max(maxx - minx, maxy - miny, 0.05)
+    zoom_scale = float(np.clip(7.5 * (8.0 / span), 20, 180))
+
+    # The five configured locations are shown as points. The choropleth provides
+    # the district polygons and district boundaries, not an interpolated trend surface.
+    fig.add_trace(go.Scattergeo(
+        lon=points["longitude"], lat=points["latitude"],
+        text=points["location"], ids=points["location"].astype(str),
+        customdata=points["location"].astype(str),
+        mode="markers+text", textposition="top center",
+        marker=dict(size=10, color="#D97736", line=dict(width=1.5, color="#FFFFFF")),
+        name="NASA POWER study points",
+        hovertemplate="<b>%{text}</b><br>NASA POWER grid-cell point<extra></extra>",
+    ))
+    fig.update_geos(
+        scope="africa", showcountries=True, showland=True, landcolor="#F7F8F6",
+        showocean=True, oceancolor="#DCE8E8", showcoastlines=True,
+        coastlinecolor="#A9B8B7", center=center,
+        projection=dict(type="mercator", scale=zoom_scale),
+        fitbounds=False,
+    )
+    fig.update_layout(
+        height=480, margin=dict(l=0, r=0, t=8, b=0),
+        paper_bgcolor="white", plot_bgcolor="white",
+        font=dict(color="#203744"),
+        legend=dict(orientation="h", y=-0.06, x=0.02),
+        clickmode="event+select",
+    )
+    return fig, metadata
 
 def build_location_boundary_map(trends, variable, selected_location):
     """Map real Ghana ADM2 polygons and link polygons containing study points."""
