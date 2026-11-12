@@ -593,6 +593,11 @@ with control_period:
 sel=df[(df.location==loc)&(df.variable==var)]
 unit=sel.unit.iat[0]
 row=trends[(trends.location==loc)&(trends.variable==var)].iloc[0]
+
+# Rebuild the selected monthly and annual series for all linked analysis panels.
+# These are derived from the QC-filtered observations for the active location/variable.
+m = monthly_series(sel)
+ann = annual_series(m, how=config.annual_how(var)) if not m.empty else pd.Series(dtype=float)
 st.sidebar.markdown("## Current selection")
 st.sidebar.markdown(f"**{loc}**")
 st.sidebar.markdown(f"**{name(var)}**")
