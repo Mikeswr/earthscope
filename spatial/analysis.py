@@ -1,6 +1,8 @@
 """Per-cell spatial summaries and statistically corrected trend evidence."""
 import numpy as np
 import pandas as pd
+from shapely.geometry import Point, shape
+from shapely.ops import unary_union
 
 from earthscope import config
 from earthscope.trends import engine
@@ -105,3 +107,25 @@ def grid_cell_bounds(frame):
         return float(np.median(diffs))
 
     return spacing(latitudes), spacing(longitudes)
+
+
+
+def filter_cells_to_boundary(frame, boundary_geojson):
+    """Keep cells whose returned centres fall within the supplied administrative union."""
+    if frame.empty or not boundary_geojson:
+        return frame.copy()
+    geometries = [
+        shape(feature["geometry"])
+        for feature in boundary_geojson.get("features", [])
+        if feature.get("geometry")
+    ]
+    if not geometries:
+        return frame.copy()
+    country_geometry = unary_union(geometries)
+    centres = frame[["cell_id", "latitude", "longitude"]].drop_duplicates("cell_id")
+    inside = {
+        row.cell_id
+        for row in centres.itertuples(index=False)
+        if country_geometry.covers(Point(float(row.longitude), float(row.latitude)))
+    }
+    return frame[frame["cell_id"].isin(inside)].copy()
