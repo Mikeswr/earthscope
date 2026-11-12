@@ -669,53 +669,34 @@ with st.expander("Interpret this result and its limitations"):
         "Statistical evidence does not identify the cause of a trend."
     )
 
-# StoryMaps-inspired coordinated dashboard overview. All panels use the same
-# selected location and variable, while preserving the detailed analysis tabs below.
-st.markdown("---")
-st.markdown("## Explore the environmental signal")
-st.caption("The panels below are linked to your selected location and NASA parameter.")
-
-overview_left, overview_middle, overview_map = st.columns([0.88, 1.18, 2.05], gap="small")
-display_start, display_end = display_years
-m_display = m[(m.index.year >= display_start) & (m.index.year <= display_end)]
-ann_display = ann[(ann.index >= display_start) & (ann.index <= display_end)]
+# Compact landing view: one short result summary beside the spatial evidence map.
+st.markdown("### Explore the selected area")
+overview_left, overview_map = st.columns([0.72, 2.28], gap="medium")
 
 with overview_left:
-    st.markdown("#### Selected location")
-    st.markdown(f"### {loc}")
-    st.caption(f"{name(var)} · NASA parameter {var}")
-    st.metric("Annual observations", int(row["n_years"]) if pd.notna(row["n_years"]) else "n/a")
-    st.metric("Mean for displayed period", f"{number(ann_display.mean(), 2)} {unit}" if len(ann_display) else "Not available")
-    trend_value = row.get("sen_per_decade", np.nan)
-    st.metric("Long-term trend", f"{number(trend_value, 3)} {unit}/decade" if pd.notna(trend_value) else "Not available")
-    evidence_label = str(row.get("evidence_class", "insufficient_data")).replace("_", " ").title()
-    st.caption(f"Evidence: {evidence_label}")
-    if pd.notna(row.get("mk_p_fdr", np.nan)):
-        st.caption(f"FDR-adjusted p-value: {number(row['mk_p_fdr'], 4)}")
-    st.caption("Trend statistics use the full validated analysis period, not just the chart window.")
-
-with overview_middle:
-    st.markdown("#### Seasonal pattern")
-    monthly_climatology = m_display.groupby(m_display.index.month).mean().reindex(range(1, 13))
-    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    seasonal_fig = go.Figure(go.Scatter(
-        x=monthly_climatology.values, y=month_names, mode="lines+markers",
-        line=dict(color="#1C7293", width=3), marker=dict(size=7),
-        name="Monthly climatology",
-        hovertemplate="%{y}: %{x:.2f} " + unit + "<extra></extra>"
-    ))
-    seasonal_fig.update_layout(
-        xaxis_title=unit, yaxis_title="", height=350,
-        margin=dict(l=5, r=12, t=12, b=35),
-        plot_bgcolor="white", paper_bgcolor="white",
-        font=dict(color="#203744"), showlegend=False
+    st.markdown(f"#### {loc}")
+    st.caption(f"{name(var)} · {display_years[0]}–{display_years[1]}")
+    st.metric(
+        "Change per decade",
+        f"{number(row['sen_per_decade'], 3)} {unit}" if pd.notna(row["sen_per_decade"]) else "Not available",
     )
-    seasonal_fig.update_yaxes(autorange="reversed")
-    st.plotly_chart(seasonal_fig, width="stretch", config={"displayModeBar": False})
-    st.caption(f"Monthly averages within {display_start}–{display_end}.")
+    evidence_label = str(row.get("evidence_class", "insufficient_data")).replace("_", " ").title()
+    st.write(f"**Evidence:** {evidence_label}")
+    if pd.notna(row.get("mk_p_fdr", np.nan)):
+        st.caption(f"FDR-adjusted p: {number(row['mk_p_fdr'], 4)}")
+    with st.expander("How to interpret this"):
+        if pd.notna(row.get("sen_ci_low_per_decade", np.nan)) and pd.notna(row.get("sen_ci_high_per_decade", np.nan)):
+            st.write(
+                f"95% confidence interval: {number(row['sen_ci_low_per_decade'], 3)} to "
+                f"{number(row['sen_ci_high_per_decade'], 3)} {unit}/decade."
+            )
+        st.write(
+            "This is a NASA POWER grid-cell estimate, not a direct station observation. "
+            "Statistical evidence does not identify the cause of change."
+        )
 
 with overview_map:
-    st.markdown("#### Spatial pattern around Ghana")
+    st.markdown("#### Spatial trend evidence across the selected area")
     try:
         first_grid_year = 1984 if var == "ALLSKY_SFC_SW_DWN" else 1981
         grid_end_year = config.latest_complete_year()
@@ -733,19 +714,17 @@ with overview_map:
             boundary_geojson=boundary_geojson,
             focus_coordinates=(float(selected_point["latitude"]), float(selected_point["longitude"])),
             selected_location=loc,
-            study_points=trends[trends["variable"] == var],
         )
         st_folium(
             regional_map,
             width=None,
-            height=520,
+            height=650,
             returned_objects=[],
             key=f"earthscope_overview_spatial_{loc}_{var}",
         )
         st.caption(
-            f"Cell-level trend evidence near {loc}. Native NASA POWER grid spacing: "
-            f"{native_spacing[0]:.3f}° × {native_spacing[1]:.3f}°. "
-            "The map uses regional grid-cell estimates, not an interpolated surface or station observations."
+            f"Native NASA POWER grid spacing: {native_spacing[0]:.3f}° × {native_spacing[1]:.3f}°. "
+            "Cell footprints show regional grid estimates. They are not interpolated or station-level measurements."
         )
         st.caption(
             f"Map tiles: OpenStreetMap. Boundaries: geoBoundaries ADM2 "
@@ -755,85 +734,6 @@ with overview_map:
         st.warning(f"The regional spatial map is unavailable for this selection: {spatial_map_error}")
         st.caption("Open the Ghana-wide map tab to retry the regional grid explorer.")
 
-st.markdown("#### Historical change over time")
-st.caption(f"{loc} · {name(var)} · displayed period {display_start}–{display_end}")
-overview_fig = go.Figure()
-overview_fig.add_trace(go.Scatter(
-    x=m_display.index, y=m_display.values, mode="lines", name="Monthly values",
-    line=dict(width=1.15, color="#1C7293")
-))
-if len(ann_display):
-    overview_fig.add_trace(go.Scatter(
-        x=[f"{y}-07-01" for y in ann_display.index], y=ann_display.values,
-        mode="markers", name="Annual summary",
-        marker=dict(size=5, color="#D98C45")
-    ))
-if pd.notna(row["sen_per_decade"]) and len(ann_display):
-    overview_slope = row["sen_per_decade"] / 10
-    overview_intercept = float(np.median(ann.values - overview_slope * ann.index.values))
-    overview_years = np.array([ann_display.index.min(), ann_display.index.max()])
-    overview_fig.add_trace(go.Scatter(
-        x=[f"{y}-07-01" for y in overview_years],
-        y=overview_intercept + overview_slope * overview_years,
-        mode="lines", name="Full-period Sen trend",
-        line=dict(dash="dash", width=2.5, color="#C84C4C")
-    ))
-overview_fig.update_layout(
-    yaxis_title=f"{name(var)} ({unit})", xaxis_title="Year",
-    height=410, margin=dict(l=10, r=10, t=15, b=55),
-    legend=dict(orientation="h", y=-0.18, x=0),
-    hovermode="x unified", plot_bgcolor="white", paper_bgcolor="white",
-    font=dict(color="#203744"),
-    xaxis=dict(
-        rangeselector=dict(buttons=[
-            dict(count=5, label="5y", step="year", stepmode="backward"),
-            dict(count=10, label="10y", step="year", stepmode="backward"),
-            dict(step="all", label="All")
-        ]),
-        rangeslider=dict(visible=True, thickness=0.10),
-        type="date"
-    )
-)
-st.plotly_chart(overview_fig, width="stretch")
-st.caption("The dashed line is the Sen trend estimated over the full analysis period. Changing the chart window does not recalculate statistical significance.")
-
-# Plain-language interpretation of the selected, FDR-adjusted trend result.
-st.markdown("#### What does this result tell us?")
-trend_class = str(row.get("evidence_class", "insufficient_data"))
-trend_direction = str(row.get("mk_trend", "no trend"))
-slope = row.get("sen_per_decade", np.nan)
-ci_low = row.get("sen_ci_low_per_decade", np.nan)
-ci_high = row.get("sen_ci_high_per_decade", np.nan)
-analysis_start = int(row["first_year"]) if pd.notna(row.get("first_year", np.nan)) else "unknown"
-analysis_end = int(row["last_year"]) if pd.notna(row.get("last_year", np.nan)) else "unknown"
-if trend_class == "significant_after_fdr" and pd.notna(slope):
-    interpretation = (
-        f"Across {analysis_start}–{analysis_end}, {name(var).lower()} at the {loc} NASA POWER grid cell "
-        f"shows a statistically significant {trend_direction} trend of about {abs(slope):.3f} {unit} per decade. "
-        "This result remains significant after false-discovery-rate correction."
-    )
-    if pd.notna(ci_low) and pd.notna(ci_high):
-        interpretation += f" The Sen-slope 95% confidence interval is {ci_low:.3f} to {ci_high:.3f} {unit} per decade."
-    st.success(interpretation)
-elif trend_class == "significant_before_fdr_only" and pd.notna(slope):
-    st.warning(
-        f"A {trend_direction} trend of about {abs(slope):.3f} {unit} per decade was detected at {loc}, "
-        "but it did not remain statistically significant after false-discovery-rate correction. "
-        "Treat this as a weaker signal requiring further investigation."
-    )
-elif trend_class == "not_significant":
-    st.info(
-        f"The analysis did not find a statistically significant monotonic trend in {name(var).lower()} "
-        f"at {loc} after multiple-testing correction. This does not prove that conditions were unchanged."
-    )
-else:
-    st.info(
-        f"There is insufficient valid evidence to classify a long-term trend for {name(var).lower()} at {loc}."
-    )
-st.caption(
-    "These are trends in NASA POWER gridded estimates, not direct station observations. "
-    "Statistical association does not establish the cause of environmental change."
-)
 
 sptab,ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Ghana-wide map","Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
