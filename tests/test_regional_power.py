@@ -11,7 +11,7 @@ from spatial.power_regional import (
 )
 
 
-def payload():
+def payload(variable="T2M"):
     return {
         "type": "FeatureCollection",
         "header": {"fill_value": -999.0},
@@ -20,14 +20,14 @@ def payload():
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [-1.0, 6.0]},
                 "properties": {
-                    "parameter": {"T2M": {"202401": 28.1, "202402": 29.2, "202413": 28.6}}
+                    "parameter": {variable: {"202401": 28.1, "202402": 29.2, "202413": 28.6}}
                 },
             },
             {
                 "type": "Feature",
                 "geometry": {"type": "Point", "coordinates": [-0.5, 6.0]},
                 "properties": {
-                    "parameter": {"T2M": {"202401": 27.8, "202402": -999.0}}
+                    "parameter": {variable: {"202401": 27.8, "202402": -999.0}}
                 },
             },
         ],
