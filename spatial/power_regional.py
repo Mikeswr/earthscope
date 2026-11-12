@@ -37,19 +37,23 @@ def build_tiles(bbox=None, max_span=MAX_TILE_SPAN_DEGREES):
         raise ValueError("bbox must be (west, south, east, north) in valid geographic coordinates")
     if not (0 < max_span <= 4.5):
         raise ValueError("max_span must be greater than 0 and no more than 4.5 degrees")
+    def split_axis(lower, upper):
+        length = upper - lower
+        count = max(1, int(math.ceil(length / max_span)))
+        edges = np.linspace(lower, upper, count + 1)
+        return [(float(edges[i]), float(edges[i + 1])) for i in range(count)]
+
+    # Equal-width tiles avoid tiny remainder boxes that can fall between native
+    # POWER grid centres and be rejected or return no cells.
+    lat_intervals = split_axis(south, north)
+    lon_intervals = split_axis(west, east)
     tiles = []
-    lat0 = south
-    while lat0 < north - 1e-9:
-        lat1 = min(lat0 + max_span, north)
-        lon0 = west
-        while lon0 < east - 1e-9:
-            lon1 = min(lon0 + max_span, east)
+    for lat0, lat1 in lat_intervals:
+        for lon0, lon1 in lon_intervals:
             tiles.append({
                 "west": round(lon0, 6), "south": round(lat0, 6),
                 "east": round(lon1, 6), "north": round(lat1, 6),
             })
-            lon0 = lon1
-        lat0 = lat1
     return tiles
 
 
