@@ -13,3 +13,4 @@ pyyaml
 python-dotenv
 pytest
 matplotlib
+shapely
