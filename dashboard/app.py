@@ -914,7 +914,7 @@ st.caption(
     "Statistical association does not establish the cause of environmental change."
 )
 
-ts,tr,fu,an,mp,qc,about,owtab,agtab,sptab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring","Spatial Explorer"])
+sptab,ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Ghana-wide map","Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -1196,42 +1196,55 @@ with agtab:
 
 
 with sptab:
-    st.markdown("### Explore Ghana's environmental grid")
-    st.write(
-        "Explore actual NASA POWER regional grid-cell estimates across Ghana. "
-        "This is separate from the five-location study and uses each variable's native grid."
+    st.markdown("### Ghana-wide environmental map")
+    st.caption(
+        "Explore NASA POWER regional grid cells across Ghana. Choose what the map displays, "
+        "then select a cell to inspect its value or trend statistics."
     )
+
+    control_variable, control_period, control_layer = st.columns([1.15, 1.35, 1.1], gap="medium")
     spatial_variables = list(config.POWER_PARAMS)
-    spatial_variable = st.selectbox(
-        "Environmental variable",
-        spatial_variables,
-        format_func=lambda code: f"{config.VARIABLE_LABELS.get(code, code)} ({code})",
-        key="spatial_variable",
-    )
+    with control_variable:
+        spatial_variable = st.selectbox(
+            "Variable",
+            spatial_variables,
+            format_func=lambda code: f"{config.VARIABLE_LABELS.get(code, code)} ({code})",
+            key="spatial_variable",
+        )
     earliest_year = 1984 if spatial_variable == "ALLSKY_SFC_SW_DWN" else 1981
     latest_year = config.latest_complete_year()
-    default_period = (earliest_year, latest_year)
-    spatial_period = st.slider(
-        "Analysis period",
-        min_value=earliest_year,
-        max_value=latest_year,
-        value=default_period,
-        step=1,
-        key=f"spatial_period_{spatial_variable}",
-    )
-    spatial_mode = st.radio(
-        "Map layer",
-        ["Mean value", "Trend evidence"],
-        horizontal=True,
-        key="spatial_map_mode",
-    )
+    with control_period:
+        spatial_period = st.slider(
+            "Period",
+            min_value=earliest_year,
+            max_value=latest_year,
+            value=(earliest_year, latest_year),
+            step=1,
+            key=f"spatial_period_{spatial_variable}",
+        )
+    with control_layer:
+        st.markdown("**Map display**")
+        spatial_mode = st.radio(
+            "Choose a map layer",
+            ["Mean value", "Trend evidence"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="spatial_map_mode",
+        )
+
     spatial_key = (spatial_variable, int(spatial_period[0]), int(spatial_period[1]))
-    if st.button("Load / update Ghana grid", key="load_ghana_regional_grid"):
+    load_col, status_col = st.columns([1, 3], gap="small")
+    with load_col:
+        load_grid = st.button("Load / update map", type="primary", key="load_ghana_regional_grid", use_container_width=True)
+    with status_col:
+        st.caption(
+            f"Showing {config.VARIABLE_LABELS.get(spatial_variable, spatial_variable)} "
+            f"from {spatial_period[0]} to {spatial_period[1]} · {spatial_mode}"
+        )
+
+    if load_grid:
         try:
-            with st.spinner(
-                f"Retrieving {spatial_variable} grid cells from NASA POWER for "
-                f"{spatial_period[0]}–{spatial_period[1]}..."
-            ):
+            with st.spinner("Loading NASA POWER regional grid..."):
                 spatial_frame = load_regional_grid_cached(*spatial_key)
             st.session_state["spatial_grid_data"] = spatial_frame
             st.session_state["spatial_grid_key"] = spatial_key
@@ -1240,7 +1253,7 @@ with sptab:
             st.session_state["spatial_grid_error"] = str(exc)
 
     if st.session_state.get("spatial_grid_error"):
-        st.error(f"Regional data could not be loaded: {st.session_state['spatial_grid_error']}")
+        st.error(f"Grid data could not be loaded: {st.session_state['spatial_grid_error']}")
 
     spatial_frame = st.session_state.get("spatial_grid_data")
     if spatial_frame is not None and st.session_state.get("spatial_grid_key") == spatial_key:
@@ -1252,8 +1265,8 @@ with sptab:
         try:
             if boundary_geojson is None:
                 raise ValueError(
-                    "Ghana district boundaries are unavailable. The national grid map is withheld "
-                    "rather than displaying neighbouring-country cells as Ghana observations."
+                    "Ghana district boundaries are unavailable. The map is withheld rather "
+                    "than showing neighbouring-country cells as Ghana observations."
                 )
             spatial_map, spatial_summary, spatial_spacing = build_regional_grid_map(
                 spatial_frame,
@@ -1266,70 +1279,66 @@ with sptab:
             cell_count = int(spatial_summary["cell_id"].nunique())
             retained_cells = set(spatial_summary["cell_id"])
             record_count = int(spatial_frame["cell_id"].isin(retained_cells).sum())
-            metric_a, metric_b, metric_c = st.columns(3)
-            metric_a.metric("Grid cells returned", f"{cell_count:,}")
-            metric_b.metric("Monthly cell records", f"{record_count:,}")
-            metric_c.metric(
-                "Native grid spacing",
-                f"{spatial_spacing[0]:.3f}° × {spatial_spacing[1]:.3f}°",
-            )
+
+            map_stat_1, map_stat_2, map_stat_3 = st.columns(3)
+            map_stat_1.metric("Ghana grid cells", f"{cell_count:,}")
+            map_stat_2.metric("Monthly records", f"{record_count:,}")
+            map_stat_3.metric("Native grid spacing", f"{spatial_spacing[0]:.3f}° × {spatial_spacing[1]:.3f}°")
+
             st_folium(
                 spatial_map,
                 width=None,
-                height=610,
+                height=690,
                 returned_objects=[],
                 key=f"earthscope_regional_grid_{spatial_variable}_{spatial_mode.replace(' ', '_')}",
             )
+
             if spatial_mode == "Mean value":
-                display_columns = [
-                    "cell_id", "latitude", "longitude", "mean_value", "n_months", "unit"
-                ]
-                st.markdown("#### Grid-cell summary")
-                st.dataframe(
-                    spatial_summary[display_columns].round(4),
-                    hide_index=True,
-                    width="stretch",
-                )
+                display_columns = ["cell_id", "latitude", "longitude", "mean_value", "n_months", "unit"]
+                detail_title = "Grid-cell mean values"
             else:
                 display_columns = [
                     "cell_id", "latitude", "longitude", "trend", "sen_per_decade",
                     "mk_p", "mk_p_fdr", "evidence_class", "n_years",
                 ]
-                st.markdown("#### Cell-level trend statistics")
+                detail_title = "Cell-level trend statistics"
+
+            with st.expander(detail_title):
                 st.dataframe(
                     spatial_summary[display_columns].round(4),
                     hide_index=True,
                     width="stretch",
                 )
-                st.caption(
-                    "Trend tests use annual values requiring all 12 months, the AR(1) effective-sample-size "
-                    "correction, and Benjamini–Hochberg false-discovery-rate adjustment across the returned "
-                    "grid cells for this variable."
+                if spatial_mode == "Trend evidence":
+                    st.caption(
+                        "Trend tests use annual values requiring all 12 months, an AR(1) "
+                        "effective-sample-size correction, and Benjamini–Hochberg FDR adjustment "
+                        "across the returned cells."
+                    )
+                st.download_button(
+                    "Download cell results (CSV)",
+                    spatial_summary.to_csv(index=False),
+                    file_name=f"earthscope_{spatial_variable}_{spatial_mode.lower().replace(' ', '_')}_cells.csv",
+                    mime="text/csv",
+                    key="download_spatial_cell_results",
                 )
-            st.caption(
-                "Only NASA POWER cells whose returned centres fall inside Ghana's district-boundary union "
-                "are retained. Approximate grid-cell footprints are clipped to Ghana's boundary and inferred "
-                "from returned cell-centre spacing. They are not official NASA cell-boundary polygons. "
-                "No values are interpolated between cells, and a grid cell is not a weather-station observation."
-            )
-            st.caption(
-                f"Source: NASA POWER regional monthly API. "
-                f"Boundary overlay: geoBoundaries ADM2 "
-                f"{boundary_metadata.get('boundaryYearRepresented', '2019')} where available."
-            )
-            st.download_button(
-                "Download spatial cell results (CSV)",
-                spatial_summary.to_csv(index=False),
-                file_name=f"earthscope_{spatial_variable}_{spatial_mode.lower().replace(' ', '_')}_cells.csv",
-                mime="text/csv",
-                key="download_spatial_cell_results",
-            )
+
+            with st.expander("Data and map notes"):
+                st.markdown(
+                    "Only NASA POWER cells whose returned centres fall inside Ghana's district-boundary "
+                    "union are retained. Cell footprints are approximate display areas inferred from "
+                    "returned centre spacing and clipped to Ghana's boundary. They are not official NASA "
+                    "cell polygons. No values are interpolated, and a grid cell is not a weather-station observation."
+                )
+                st.caption(
+                    f"Source: NASA POWER regional monthly API. Boundary overlay: geoBoundaries ADM2 "
+                    f"{boundary_metadata.get('boundaryYearRepresented', '2019')} where available."
+                )
         except Exception as exc:
             st.error(f"The spatial map could not be rendered safely: {exc}")
     else:
         st.info(
-            "Choose a variable and analysis period, then select **Load / update Ghana grid**. "
-            "EarthScope will retrieve the regional grid for that variable from NASA POWER. "
+            "Choose a variable, period and map display above, then select **Load / update map**. "
             "The first request may take a little time. Results are cached for seven days."
         )
 
