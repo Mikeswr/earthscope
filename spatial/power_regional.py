@@ -202,7 +202,10 @@ def fetch_tile(variable, tile, start_year, end_year, session=None, timeout=(20, 
         except requests.HTTPError as exc:
             status = getattr(exc.response, "status_code", None)
             if status is not None and 400 <= status < 500:
-                raise RegionalPowerError(f"NASA POWER rejected {variable} tile: {exc}") from exc
+                detail = getattr(exc.response, "text", "") if exc.response is not None else ""
+                raise RegionalPowerError(
+                    f"NASA POWER rejected {variable} tile (HTTP {status}): {detail[:1500] or exc}"
+                ) from exc
             last_error = exc
         except (requests.RequestException, ValueError, RegionalPowerError) as exc:
             last_error = exc
