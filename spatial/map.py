@@ -8,7 +8,7 @@ from branca.colormap import LinearColormap
 from shapely.geometry import box, mapping, shape
 from shapely.ops import unary_union
 
-from spatial.analysis import (
+from earthscope.spatial.analysis import (
     cell_trend_table,
     filter_cells_to_boundary,
     grid_cell_bounds,
