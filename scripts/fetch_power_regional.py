@@ -9,8 +9,12 @@ different native spatial resolutions. No interpolation or resampling is performe
 """
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Make the repository package importable when this file is run as a module.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from spatial.power_regional import fetch_parameter, estimate_grid_spacing
 from earthscope import config
