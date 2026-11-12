@@ -396,6 +396,7 @@ def build_leaflet_location_map(trends, variable, selected_location, geojson):
             if geom.covers(Point(float(row["longitude"]), float(row["latitude"]))):
                 matched.append(str(row["location"]))
         props["_earthscope_locations"] = matched
+        props["_earthscope_location"] = matched[0] if matched else ""
         if selected_location in matched:
             selected_feature = feature
 
@@ -432,7 +433,7 @@ def build_leaflet_location_map(trends, variable, selected_location, geojson):
             aliases=["District:"], sticky=True
         ) if features and "shapeName" in (features[0].get("properties") or {}) else None,
         popup=folium.GeoJsonPopup(
-            fields=["_earthscope_locations"],
+            fields=["_earthscope_location"],
             aliases=["EarthScope study location:"],
             labels=True,
         ),
@@ -748,13 +749,19 @@ with overview_map:
         boundary_geojson, boundary_metadata = load_ghana_district_geojson()
         leaflet_map = build_leaflet_location_map(trends, var, loc, boundary_geojson)
         map_event = st_folium(
-            leaflet_map, width=None, height=520, returned_objects=["last_active_drawing"],
+            leaflet_map, width=None, height=520,
+            returned_objects=["last_object_clicked_popup", "last_object_clicked_tooltip"],
             key="earthscope_leaflet_location_map",
         )
-        drawing = (map_event or {}).get("last_active_drawing") or {}
-        properties = drawing.get("properties") or {}
-        clicked_locations = properties.get("_earthscope_locations") or []
-        selected_from_map = next((x for x in clicked_locations if x in df["location"].unique()), None)
+        popup_text = str((map_event or {}).get("last_object_clicked_popup") or "")
+        tooltip_text = str((map_event or {}).get("last_object_clicked_tooltip") or "")
+        selected_from_map = next(
+            (x for x in df["location"].unique() if x and x in popup_text), None
+        )
+        if selected_from_map is None:
+            selected_from_map = next(
+                (x for x in df["location"].unique() if x and x in tooltip_text), None
+            )
         if selected_from_map and selected_from_map != loc:
             st.session_state["study_location"] = selected_from_map
             st.rerun()
