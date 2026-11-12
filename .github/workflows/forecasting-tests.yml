@@ -7,6 +7,7 @@ on:
       - "scripts/**"
       - "tests/**"
       - "dashboard/**"
+      - "spatial/**"
       - "ingest/**"
       - "trends/**"
       - "config.py"
