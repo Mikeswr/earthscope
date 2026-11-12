@@ -10,10 +10,7 @@ NASA POWER Monthly Regional API:
 
 `https://power.larc.nasa.gov/api/temporal/monthly/regional`
 
-The API accepts one parameter per regional request. The downloader divides the
-Ghana bounding box into smaller request tiles, then combines returned cell
-records by their actual coordinates. It does not interpolate, resample, or
-assign a city trend to an entire administrative district.
+The API accepts one parameter per regional request and requires at least a 2-degree longitude range. The downloader divides the Ghana bounding box into balanced request tiles, then combines returned cell records by their actual coordinates. It does not interpolate, resample, or assign a city trend to an entire administrative district.
 
 NASA documents current native spatial resolutions of approximately 0.5° ×
 0.625° for meteorological parameters and 1° × 1° for solar parameters. The
@@ -48,10 +45,15 @@ locally or in a deployment data volume after the live endpoint has been verified
 
 ## Validation status and cautions
 
-Automated tests use mocked GeoJSON fixtures. They verify tiling, parsing,
-missing-value handling, coordinate preservation, and parameter-specific
-temporal coverage. They do not establish that a live NASA endpoint response
-has been retrieved successfully.
+A live NASA POWER regional smoke test succeeded for all seven variables over
+2020–2021. The returned meteorological grids contained 91 cells per variable
+at 0.5° latitude × 0.625° longitude spacing. The solar grid contained 24 cells
+at 1° × 1° spacing. This confirms the live request format and parameter access
+for that sample period. It does not yet validate the complete 1981–2025 archive.
+
+Automated tests also use mocked GeoJSON fixtures. They verify tiling, parsing,
+missing-value handling, coordinate preservation, per-cell summaries, trend
+statistics, and map legends.
 
 Before enabling a public map, run the downloader for a short period (for example
 2020–2021) and inspect:
@@ -66,3 +68,19 @@ station observations. They are not sufficiently detailed to represent
 neighbourhood-scale conditions within Accra. For urban-scale temperature
 mapping, use an appropriate higher-resolution satellite land-surface
 temperature product as a separate dataset and analysis pathway.
+
+
+## Spatial Explorer display
+
+The dashboard's Spatial Explorer retrieves only the selected variable and
+period, then caches the result for seven days. It offers:
+- Period mean by native grid cell.
+- Per-cell annual Mann–Kendall and Sen's slope results, with AR(1) effective
+  sample-size correction and Benjamini–Hochberg FDR adjustment across cells.
+- A map legend and cell-level tooltips.
+- Optional Ghana ADM2 boundaries for geographic context.
+
+Cell rectangles are approximate display footprints inferred from returned
+cell-centre spacing. They are not official NASA cell polygons. The dashboard
+does not interpolate between cells or treat an administrative district as
+the measurement unit.
