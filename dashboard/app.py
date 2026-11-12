@@ -581,14 +581,20 @@ with control_variable:
     var = st.selectbox("Environmental variable", sorted(df["variable"].unique()),
                        format_func=lambda v: f"{name(v)} · {v}", key="study_variable")
 with control_period:
-    date_values = pd.to_datetime(df["date"], errors="coerce")
-    available_years = date_values.dropna().dt.year
-    min_available_year = int(available_years.min())
-    max_available_year = int(available_years.max())
-    display_years = st.slider("Chart period", min_value=min_available_year,
-                              max_value=max_available_year,
-                              value=(min_available_year, max_available_year),
-                              key="display_years")
+    selected_dates = pd.to_datetime(
+        df.loc[(df["location"] == loc) & (df["variable"] == var), "date"],
+        errors="coerce",
+    ).dropna()
+    valid_years = selected_dates.dt.year
+    min_available_year = int(valid_years.min())
+    max_available_year = int(valid_years.max())
+    display_years = st.slider(
+        "Chart period",
+        min_value=min_available_year,
+        max_value=max_available_year,
+        value=(min_available_year, max_available_year),
+        key=f"display_years_{loc}_{var}",
+    )
 
 sel=df[(df.location==loc)&(df.variable==var)]
 unit=sel.unit.iat[0]
@@ -609,36 +615,6 @@ st.sidebar.caption(f"Chart display: {display_years[0]}–{display_years[1]}")
 if (df.unit_source!="response_metadata").any():
     st.sidebar.warning("Some units were assumed from documentation rather than read from source metadata.")
 
-st.markdown("## EarthScope")
-st.caption(
-    "Explore how environmental conditions have changed across Ghana, where the evidence is strongest, "
-    "and how those patterns vary from place to place."
-)
-
-with st.expander("Featured finding: Accra surface solar energy"):
-    featured_solar = trends[
-        (trends["location"] == "Accra")
-        & (trends["variable"] == "ALLSKY_SFC_SW_DWN")
-    ]
-    if not featured_solar.empty:
-        solar = featured_solar.iloc[0]
-        st.metric(
-            "Estimated change per decade",
-            f"{solar['sen_per_decade']:.4f} kWh/m²/day",
-        )
-        st.write(
-            f"NASA POWER estimates show a declining long-term trend at the Accra grid point "
-            f"between {int(solar['first_year'])} and {int(solar['last_year'])}. "
-            f"The 95% confidence interval is {solar['sen_ci_low_per_decade']:.4f} to "
-            f"{solar['sen_ci_high_per_decade']:.4f} kWh/m²/day per decade."
-        )
-        st.caption(
-            f"FDR-adjusted p-value: {solar['mk_p_fdr']:.4f}. This is a gridded estimate, "
-            "not a ground-based radiation measurement. It does not establish the cause."
-        )
-    else:
-        st.info("The featured solar result is not available in the current dataset.")
-
 st.divider()
 st.markdown(f"## {loc} · {name(var)}")
 st.caption(f"{desc(var)}  |  NASA parameter: {var}  |  Unit: {unit}")
@@ -646,9 +622,10 @@ st.caption(f"{desc(var)}  |  NASA parameter: {var}  |  Unit: {unit}")
 metric_a, metric_b, metric_c = st.columns(3)
 metric_a.metric("Valid years", int(row["n_years"]) if pd.notna(row["n_years"]) else "n/a")
 metric_b.metric(
-    "Change per decade",
-    f"{number(row['sen_per_decade'], 3)} {unit}" if pd.notna(row["sen_per_decade"]) else "Not available",
+    f"Change per decade ({unit})",
+    number(row["sen_per_decade"], 3) if pd.notna(row["sen_per_decade"]) else "Not available",
 )
+metric_b.caption(f"Unit: {unit} per decade")
 metric_c.metric("FDR-adjusted p-value", number(row.get("mk_p_fdr", np.nan), 4))
 
 evidence = str(row.get("evidence_class", "insufficient_data")).lower()
@@ -681,10 +658,6 @@ overview_left, overview_map = st.columns([0.72, 2.28], gap="medium")
 with overview_left:
     st.markdown(f"#### {loc}")
     st.caption(f"{name(var)} · {display_years[0]}–{display_years[1]}")
-    st.metric(
-        "Change per decade",
-        f"{number(row['sen_per_decade'], 3)} {unit}" if pd.notna(row["sen_per_decade"]) else "Not available",
-    )
     evidence_label = str(row.get("evidence_class", "insufficient_data")).replace("_", " ").title()
     st.write(f"**Evidence:** {evidence_label}")
     if pd.notna(row.get("mk_p_fdr", np.nan)):
@@ -740,18 +713,32 @@ with overview_map:
         st.caption("Open the Ghana-wide map tab to retry the regional grid explorer.")
 
 
-sptab,ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Ghana-wide map","Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
+sptab,ts,tr,fu,an,about,owtab,agtab=st.tabs(["Ghana-wide map","Explore time series","Compare trends","Future outlook","Unusual conditions","Data & methods","Weather now","Agromonitoring"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
     fig=go.Figure()
-    fig.add_trace(go.Scatter(x=m.index,y=m.values,mode="lines",name="Monthly values",line=dict(width=1.2,color="#2386C8")))
-    fig.add_trace(go.Scatter(x=[f"{y}-07-01" for y in ann.index],y=ann.values,mode="markers",name="Annual summary",marker=dict(size=6,color="#F2A65A")))
-    if not np.isnan(row["sen_per_decade"]) and len(ann):
-        slope=row["sen_per_decade"]/10
-        intercept=float(np.median(ann.values-slope*ann.index.values))
-        years=np.array([ann.index.min(),ann.index.max()])
-        fig.add_trace(go.Scatter(x=[f"{y}-07-01" for y in years],y=intercept+slope*years,mode="lines",name="Sen's slope",line=dict(dash="dash",width=3,color="#D95745")))
+    m_display = m[(m.index.year >= display_years[0]) & (m.index.year <= display_years[1])]
+    ann_display = ann[(ann.index >= display_years[0]) & (ann.index <= display_years[1])]
+    fig.add_trace(go.Scatter(
+        x=m_display.index, y=m_display.values, mode="lines", name="Monthly values",
+        line=dict(width=1.2,color="#2386C8"),
+    ))
+    fig.add_trace(go.Scatter(
+        x=[pd.Timestamp(year=int(y), month=7, day=1) for y in ann_display.index],
+        y=ann_display.values, mode="markers", name="Annual summary",
+        marker=dict(size=6,color="#F2A65A"),
+    ))
+    if pd.notna(row["sen_per_decade"]) and len(ann):
+        slope=float(row["sen_per_decade"])/10.0
+        intercept=float(np.median(ann.values-slope*ann.index.to_numpy(dtype=float)))
+        trend_years=np.array([display_years[0],display_years[1]],dtype=float)
+        fig.add_trace(go.Scatter(
+            x=[pd.Timestamp(year=int(y),month=7,day=1) for y in trend_years],
+            y=intercept+slope*trend_years,
+            mode="lines", name="Sen's slope",
+            line=dict(dash="dash",width=4,color="#D95745"),
+        ))
     fig.update_layout(yaxis_title=f"{name(var)} ({unit})",height=440,legend=dict(orientation="h",y=-.2),hovermode="x unified",plot_bgcolor="white",paper_bgcolor="white")
     st.plotly_chart(fig,width="stretch")
     st.info("Short-term peaks and dips do not, by themselves, establish a long-term climate trend.")
@@ -862,19 +849,18 @@ with an:
     st.metric("Flagged observations",f"{len(flagged):,}")
     st.dataframe(flagged[["date","value","anomaly","z"]].round({"value":3,"anomaly":3,"z":3}),hide_index=True,width="stretch")
 
-with mp:
+with sptab:
     st.markdown("### Where do the location results differ?")
     st.write("Each marker represents one configured NASA POWER grid-cell location.")
     st.plotly_chart(point_trend_map(trends,var),width="stretch")
     st.warning("This is a map of five point results, not an interpolated continuous spatial trend field.")
 
-with qc:
+with about:
     st.markdown("### How complete and reliable is the dataset?")
     st.dataframe(checks.completeness(df).round({"pct_valid":1}),hide_index=True,width="stretch")
     st.dataframe(df.qc_flag.value_counts().rename_axis("Flag").reset_index(name="Records"),hide_index=True,width="stretch")
     st.caption("Missing or flagged values remain at their original calendar positions and are excluded from calculations. They are not interpolated.")
 
-with about:
     st.markdown("### Understand the data behind EarthScope")
     st.markdown("**NASA POWER** provides gridded environmental estimates derived from satellite observations and modelling/reanalysis systems. These are not direct weather-station measurements. Each selected location represents a separate grid-cell time series. Five locations do not form a continuous map of Ghana. No forecasts are produced by this analysis.")
     glossary=pd.DataFrame([{"NASA code":k,"Plain-language name":v[0],"What it measures":v[1],"Unit":v[2]} for k,v in INFO.items() if k in set(df.variable)])
