@@ -1250,6 +1250,11 @@ with sptab:
             boundary_geojson, boundary_metadata = None, {}
 
         try:
+            if boundary_geojson is None:
+                raise ValueError(
+                    "Ghana district boundaries are unavailable. The national grid map is withheld "
+                    "rather than displaying neighbouring-country cells as Ghana observations."
+                )
             spatial_map, spatial_summary, spatial_spacing = build_regional_grid_map(
                 spatial_frame,
                 spatial_variable,
@@ -1258,8 +1263,9 @@ with sptab:
                 mode=spatial_mode,
                 boundary_geojson=boundary_geojson,
             )
-            cell_count = int(spatial_frame["cell_id"].nunique())
-            record_count = int(len(spatial_frame))
+            cell_count = int(spatial_summary["cell_id"].nunique())
+            retained_cells = set(spatial_summary["cell_id"])
+            record_count = int(spatial_frame["cell_id"].isin(retained_cells).sum())
             metric_a, metric_b, metric_c = st.columns(3)
             metric_a.metric("Grid cells returned", f"{cell_count:,}")
             metric_b.metric("Monthly cell records", f"{record_count:,}")
@@ -1301,10 +1307,10 @@ with sptab:
                     "grid cells for this variable."
                 )
             st.caption(
-                "Grid-cell rectangles are approximate display footprints inferred from NASA's returned "
-                "cell-centre coordinates and their median spacing. They are not official cell-boundary "
-                "polygons. District boundaries provide geographic context only. No values are interpolated "
-                "between cells, and a grid cell does not represent a weather-station observation."
+                "Only NASA POWER cells whose returned centres fall inside Ghana's district-boundary union "
+                "are retained. Approximate grid-cell footprints are clipped to Ghana's boundary and inferred "
+                "from returned cell-centre spacing. They are not official NASA cell-boundary polygons. "
+                "No values are interpolated between cells, and a grid cell is not a weather-station observation."
             )
             st.caption(
                 f"Source: NASA POWER regional monthly API. "
