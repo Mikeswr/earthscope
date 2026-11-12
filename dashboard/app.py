@@ -386,6 +386,89 @@ st.caption(
 )
 st.caption("NASA POWER historical monthly data. These are gridded estimates, not direct weather-station observations.")
 
+# StoryMaps-inspired coordinated dashboard overview. All panels use the same
+# selected location and variable, while preserving the detailed analysis tabs below.
+st.markdown("---")
+st.markdown("## Explore the environmental signal")
+st.caption("The panels below are linked to your selected location and NASA parameter.")
+
+overview_left, overview_middle, overview_map = st.columns([0.9, 1.15, 2.0], gap="small")
+
+with overview_left:
+    st.markdown("#### Study snapshot")
+    st.metric("Valid annual observations", int(row["n_years"]) if pd.notna(row["n_years"]) else "n/a")
+    st.metric("Annual mean", f"{number(ann.mean(), 2)} {unit}" if len(ann) else "Not available")
+    st.metric("Trend estimate", f"{number(row['sen_per_decade'], 3)} {unit}/decade"
+              if pd.notna(row["sen_per_decade"]) else "Not available")
+    st.caption(f"{loc} · {var}")
+    st.caption("NASA POWER grid-cell estimates, not direct station measurements.")
+
+with overview_middle:
+    st.markdown("#### Seasonal pattern")
+    monthly_climatology = m.groupby(m.index.month).mean().reindex(range(1, 13))
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    seasonal_fig = go.Figure(go.Scatter(
+        x=monthly_climatology.values,
+        y=month_names,
+        mode="lines+markers",
+        line=dict(color="#1C7293", width=3),
+        marker=dict(size=7),
+        name="Monthly climatology",
+        hovertemplate="%{y}: %{x:.2f} " + unit + "<extra></extra>"
+    ))
+    seasonal_fig.update_layout(
+        xaxis_title=unit, yaxis_title="", height=300,
+        margin=dict(l=5, r=12, t=12, b=35),
+        plot_bgcolor="white", paper_bgcolor="white",
+        font=dict(color="#203744"), showlegend=False
+    )
+    seasonal_fig.update_yaxes(autorange="reversed")
+    st.plotly_chart(seasonal_fig, width="stretch", config={"displayModeBar": False})
+    st.caption("Average for each calendar month across the available historical record.")
+
+with overview_map:
+    st.markdown("#### Where are the study locations?")
+    st.plotly_chart(
+        point_trend_map(trends, var),
+        width="stretch",
+        config={"displayModeBar": False}
+    )
+    st.caption("Five configured grid-cell locations. This is not a continuous map of Ghana-wide trends.")
+
+st.markdown("#### Historical change over time")
+st.caption("Monthly observations and annual summaries for the selected location and variable.")
+overview_fig = go.Figure()
+overview_fig.add_trace(go.Scatter(
+    x=m.index, y=m.values, mode="lines", name="Monthly values",
+    line=dict(width=1.15, color="#1C7293")
+))
+if len(ann):
+    overview_fig.add_trace(go.Scatter(
+        x=[f"{y}-07-01" for y in ann.index], y=ann.values,
+        mode="markers", name="Annual summary",
+        marker=dict(size=5, color="#D98C45")
+    ))
+if pd.notna(row["sen_per_decade"]) and len(ann):
+    overview_slope = row["sen_per_decade"] / 10
+    overview_intercept = float(np.median(ann.values - overview_slope * ann.index.values))
+    overview_years = np.array([ann.index.min(), ann.index.max()])
+    overview_fig.add_trace(go.Scatter(
+        x=[f"{y}-07-01" for y in overview_years],
+        y=overview_intercept + overview_slope * overview_years,
+        mode="lines", name="Sen's slope",
+        line=dict(dash="dash", width=2.5, color="#C84C4C")
+    ))
+overview_fig.update_layout(
+    yaxis_title=f"{name(var)} ({unit})", xaxis_title="Year",
+    height=340, margin=dict(l=10, r=10, t=15, b=15),
+    legend=dict(orientation="h", y=-0.22),
+    hovermode="x unified", plot_bgcolor="white", paper_bgcolor="white",
+    font=dict(color="#203744")
+)
+st.plotly_chart(overview_fig, width="stretch")
+st.caption("The long-term trend is estimated statistically. Short-term fluctuations do not, by themselves, establish a climate trend.")
+
 ts,tr,fu,an,mp,qc,about,owtab,agtab=st.tabs(["Explore time series","Compare trends","Future outlook","Unusual conditions","Location map","Data quality","Methods & sources","OpenWeather now","Agromonitoring"])
 with ts:
     st.markdown("### How has this variable changed?")
