@@ -46,9 +46,10 @@ locally or in a deployment data volume after the live endpoint has been verified
 ## Validation status and cautions
 
 A live NASA POWER regional smoke test succeeded for all seven variables over
-2020–2021. The returned meteorological grids contained 91 cells per variable
-at 0.5° latitude × 0.625° longitude spacing. The solar grid contained 24 cells
-at 1° × 1° spacing. This confirms the live request format and parameter access
+2020–2021. The Ghana bounding-box requests returned 91 cells per meteorological variable
+at 0.5° latitude × 0.625° longitude spacing. The solar request returned 24 cells
+at 1° × 1° spacing. These counts are before filtering cell centres to the national
+boundary and should not be read as the number of Ghana-only cells. This confirms the live request format and parameter access
 for that sample period. It does not yet validate the complete 1981–2025 archive.
 
 Automated tests also use mocked GeoJSON fixtures. They verify tiling, parsing,
