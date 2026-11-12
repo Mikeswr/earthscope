@@ -240,8 +240,10 @@ try:
     _map_state = st.session_state.get("overview_location_map")
     _map_points = _map_state.selection.points if _map_state is not None else []
     if _map_points:
-        _map_custom = _map_points[0].get("customdata")
-        _map_location = _map_custom[0] if isinstance(_map_custom, (list, tuple)) else None
+        _map_location = _map_points[0].get("id")
+        if not _map_location:
+            _map_custom = _map_points[0].get("customdata")
+            _map_location = _map_custom[0] if isinstance(_map_custom, (list, tuple)) and len(_map_custom) > 3 else None
         if _map_location in df["location"].unique():
             st.session_state["study_location"] = _map_location
 except (AttributeError, KeyError, TypeError, IndexError):
