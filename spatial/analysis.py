@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 
 from earthscope import config
-from trends import engine
-from trends.pipeline import annual_series
+from earthscope.trends import engine
+from earthscope.trends.pipeline import annual_series
 
 
 def period_cell_means(frame, start_year, end_year):
