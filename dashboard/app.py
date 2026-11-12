@@ -597,7 +597,9 @@ with control_period:
     )
 
 sel=df[(df.location==loc)&(df.variable==var)]
-unit=sel.unit.iat[0]
+# Use one canonical display unit throughout the interface. The source values and
+# calculations are unchanged; this only standardizes unit typography.
+unit=INFO.get(var, ("", "", sel.unit.iat[0]))[2] or sel.unit.iat[0]
 row=trends[(trends.location==loc)&(trends.variable==var)].iloc[0]
 
 # Rebuild the selected monthly and annual series for all linked analysis panels.
@@ -862,7 +864,7 @@ with about:
     st.caption("Missing or flagged values remain at their original calendar positions and are excluded from calculations. They are not interpolated.")
 
     st.markdown("### Understand the data behind EarthScope")
-    st.markdown("**NASA POWER** provides gridded environmental estimates derived from satellite observations and modelling/reanalysis systems. These are not direct weather-station measurements. Each selected location represents a separate grid-cell time series. Five locations do not form a continuous map of Ghana. No forecasts are produced by this analysis.")
+    st.markdown("**NASA POWER** provides gridded environmental estimates derived from satellite observations and modelling/reanalysis systems. These are not direct weather-station measurements. The five study-location series are separate grid-cell time series; the Ghana-wide Spatial Explorer uses a separate regional grid request. The experimental outlook is a statistical extrapolation, not a climate-model projection.")
     glossary=pd.DataFrame([{"NASA code":k,"Plain-language name":v[0],"What it measures":v[1],"Unit":v[2]} for k,v in INFO.items() if k in set(df.variable)])
     st.markdown("#### Variable reference")
     st.dataframe(glossary,hide_index=True,width="stretch")
