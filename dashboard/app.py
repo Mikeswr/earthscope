@@ -67,6 +67,11 @@ html, body, [class*="css"], .stApp, .stMarkdown, .stText, p, li, label,
   opacity: 1 !important;
 }
 [data-testid="stMetric"]{background:white;border:1px solid #E2EAE6;padding:14px;border-radius:13px;min-width:0}
+[data-testid="stHorizontalBlock"] > [data-testid="column"] {min-width:0}
+[data-testid="stPlotlyChart"] {background:#FFFFFF;border:1px solid #E6ECE9;border-radius:10px;padding:5px}
+[data-testid="stSelectbox"], [data-testid="stSlider"] {background:#FFFFFF;border:1px solid #E2EAE6;border-radius:10px;padding:8px 10px}
+[data-testid="stMetric"] [data-testid="stMetricValue"] {font-weight:650}
+div[data-testid="stMarkdownContainer"] h4 {color:#1B3B6F;font-weight:650}
 .hero{background:linear-gradient(115deg,#102F40,#176E73);color:white;padding:30px 34px;border-radius:18px;margin-bottom:22px}
 .hero h1{color:white;font-size:2.4rem;margin:0 0 6px}.hero p{color:#D7EAE7;margin:0;font-size:1.05rem}
 .eyebrow{text-transform:uppercase;letter-spacing:.12em;color:#A8DCD0;font-size:.72rem;font-weight:700;margin-bottom:8px}
@@ -82,7 +87,7 @@ div[data-testid="stPlotlyChart"]{width:100%;min-width:0}
  .eyebrow{font-size:.62rem;letter-spacing:.09em}
  h2{font-size:1.25rem!important} h3{font-size:1.08rem!important}
  [data-testid="stHorizontalBlock"]{flex-wrap:wrap;gap:.55rem}
- [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 calc(50% - .55rem)!important;min-width:calc(50% - .55rem)!important}
+ [data-testid="stHorizontalBlock"]>[data-testid="column"]{flex:1 1 100%!important;min-width:100%!important}
  [data-testid="stMetric"]{padding:10px;border-radius:10px}
  [data-testid="stMetricLabel"]{font-size:.72rem}
  [data-testid="stMetricValue"]{font-size:1.25rem}
@@ -495,10 +500,19 @@ if pd.notna(row["sen_per_decade"]) and len(ann_display):
     ))
 overview_fig.update_layout(
     yaxis_title=f"{name(var)} ({unit})", xaxis_title="Year",
-    height=390, margin=dict(l=10, r=10, t=15, b=15),
-    legend=dict(orientation="h", y=-0.22),
+    height=410, margin=dict(l=10, r=10, t=15, b=55),
+    legend=dict(orientation="h", y=-0.18, x=0),
     hovermode="x unified", plot_bgcolor="white", paper_bgcolor="white",
-    font=dict(color="#203744")
+    font=dict(color="#203744"),
+    xaxis=dict(
+        rangeselector=dict(buttons=[
+            dict(count=5, label="5y", step="year", stepmode="backward"),
+            dict(count=10, label="10y", step="year", stepmode="backward"),
+            dict(step="all", label="All")
+        ]),
+        rangeslider=dict(visible=True, thickness=0.10),
+        type="date"
+    )
 )
 st.plotly_chart(overview_fig, width="stretch")
 st.caption("The dashed line is the Sen trend estimated over the full analysis period. Changing the chart window does not recalculate statistical significance.")
