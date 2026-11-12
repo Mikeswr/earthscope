@@ -114,7 +114,14 @@ def point_trend_map(trends, variable):
                            "<br>p uncorrected %{customdata[2]:.3f}<br>p FDR %{customdata[3]:.3f}"
                            "<br><i>Select point to explore location</i><extra></extra>")))
         first = False
-    fig.update_geos(fitbounds="locations", scope="africa", showcountries=True, resolution=50)
+    fig.update_geos(
+        scope="africa", showcountries=True, resolution=50,
+        showland=True, landcolor="#F1F3F1",
+        showocean=True, oceancolor="#DCE8E8",
+        showcoastlines=True, coastlinecolor="#A9B8B7",
+        center=dict(lat=8.0, lon=-1.5),
+        projection=dict(type="mercator", scale=7.5)
+    )
     fig.update_layout(
         margin=dict(l=0, r=0, t=28, b=0), height=430,
         title=dict(text=f"{variable}: Sen's slope per decade", x=0.02, xanchor="left"),
