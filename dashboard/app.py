@@ -22,13 +22,13 @@ from earthscope.forecasting.engine import ForecastError, forecast_monthly
 from spatial.power_regional import fetch_parameter
 from spatial.map import build_regional_grid_map
 
+st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
+
+
 @st.cache_data(ttl=7 * 24 * 60 * 60, show_spinner=False)
 def load_regional_grid_cached(variable, start_year, end_year):
     """Cache a verified NASA POWER regional monthly grid by variable and period."""
     return fetch_parameter(variable, start_year, end_year)
-
-
-st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
 st.markdown("""
 <style>
