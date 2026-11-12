@@ -229,6 +229,19 @@ if (df["source"]=="SYNTHETIC TEST DATA").any():
 st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation · Environmental change</div><h1>EarthScope</h1><p>Environmental change, made understandable. Explore what is changing, where it is happening, and what the evidence means.</p></div>',unsafe_allow_html=True)
 
 # Primary controls sit in the dashboard header, following the ArcGIS reference.
+# Plotly selection is stored in session state before Streamlit reruns the script.
+# Apply it before creating the location widget to avoid mutating a live widget key.
+try:
+    _map_state = st.session_state.get("overview_location_map")
+    _map_points = _map_state.selection.points if _map_state is not None else []
+    if _map_points:
+        _map_custom = _map_points[0].get("customdata")
+        _map_location = _map_custom[0] if isinstance(_map_custom, (list, tuple)) else None
+        if _map_location in df["location"].unique():
+            st.session_state["study_location"] = _map_location
+except (AttributeError, KeyError, TypeError, IndexError):
+    pass
+
 control_location, control_variable, control_period = st.columns([1.0, 1.55, 1.0], gap="medium")
 with control_location:
     loc = st.selectbox("Study location", sorted(df["location"].unique()), key="study_location")
@@ -455,15 +468,6 @@ with overview_map:
         on_select="rerun", selection_mode="points",
         key="overview_location_map"
     )
-    try:
-        selected_points = map_event.selection.points
-        if selected_points:
-            selected_location = selected_points[0].get("customdata", [None])[0]
-            if selected_location in df["location"].unique() and selected_location != loc:
-                st.session_state["study_location"] = selected_location
-                st.rerun()
-    except (AttributeError, KeyError, TypeError, IndexError):
-        pass
     st.caption("Select a point to update the dashboard. Markers show point-level trend estimates, not a continuous Ghana-wide field.")
 
 st.markdown("#### Historical change over time")
