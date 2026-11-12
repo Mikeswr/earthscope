@@ -345,7 +345,7 @@ def build_location_boundary_map(trends, variable, selected_location):
         geojson={"type": "FeatureCollection", "features": features},
         locations=[f["id"] for f in features],
         z=[1 if f["id"] == selected_district_id else 0 for f in features],
-        featureidkey="id", customdata=customdata,
+        featureidkey="properties._earthscope_id", customdata=customdata,
         colorscale=[[0, "#E5ECE9"], [0.999, "#E5ECE9"], [1, "#1C7293"]],
         zmin=0, zmax=1, showscale=False,
         marker_line_color="#849A93", marker_line_width=0.65,
@@ -355,10 +355,8 @@ def build_location_boundary_map(trends, variable, selected_location):
     if selected_bounds:
         minx, miny, maxx, maxy = selected_bounds
         center = dict(lon=(minx + maxx) / 2, lat=(miny + maxy) / 2)
-        span = max(maxx - minx, maxy - miny, 0.08)
-        zoom_scale = float(np.clip(7.5 * (8.0 / span), 18, 170))
     else:
-        center, zoom_scale = dict(lon=-1.5, lat=8.0), 7.5
+        center = dict(lon=-1.5, lat=8.0)
     fig.add_trace(go.Scattergeo(
         lon=points["longitude"], lat=points["latitude"],
         text=points["location"], ids=points["location"].astype(str),
@@ -369,10 +367,10 @@ def build_location_boundary_map(trends, variable, selected_location):
         hovertemplate="<b>%{text}</b><br>NASA POWER grid-cell point<br>Click to select<extra></extra>",
     ))
     fig.update_geos(
-        scope="africa", showcountries=True, showland=True, landcolor="#F7F8F6",
+        showcountries=True, showland=True, landcolor="#F7F8F6",
         showocean=True, oceancolor="#DCE8E8", showcoastlines=True,
         coastlinecolor="#A9B8B7", center=center,
-        projection=dict(type="mercator", scale=zoom_scale), fitbounds=False,
+        projection=dict(type="mercator"), fitbounds="locations",
     )
     fig.update_layout(
         height=470, margin=dict(l=0, r=0, t=8, b=0),
