@@ -5,8 +5,15 @@ import folium
 import numpy as np
 import pandas as pd
 from branca.colormap import LinearColormap
+from shapely.geometry import box, mapping, shape
+from shapely.ops import unary_union
 
-from spatial.analysis import cell_trend_table, grid_cell_bounds, period_cell_means
+from spatial.analysis import (
+    cell_trend_table,
+    filter_cells_to_boundary,
+    grid_cell_bounds,
+    period_cell_means,
+)
 
 EVIDENCE_COLORS = {
     "significant_after_fdr_increasing": "#238B57",
@@ -28,23 +35,65 @@ def _trend_colour(row):
     return EVIDENCE_COLORS.get(evidence, EVIDENCE_COLORS["insufficient_data"])
 
 
+def _country_geometry(boundary_geojson):
+    if not boundary_geojson:
+        return None
+    geometries = [
+        shape(feature["geometry"])
+        for feature in boundary_geojson.get("features", [])
+        if feature.get("geometry")
+    ]
+    return unary_union(geometries) if geometries else None
+
+
+def _add_grid_cell(fmap, row, colour, tooltip, lat_step, lon_step, country_geometry=None):
+    """Add an approximate cell footprint, clipped to the Ghana boundary when available."""
+    cell_geometry = box(
+        row.longitude - lon_step / 2,
+        row.latitude - lat_step / 2,
+        row.longitude + lon_step / 2,
+        row.latitude + lat_step / 2,
+    )
+    if country_geometry is not None:
+        cell_geometry = cell_geometry.intersection(country_geometry)
+    if cell_geometry.is_empty:
+        return
+    folium.GeoJson(
+        mapping(cell_geometry),
+        style_function=lambda feature, fill=colour: {
+            "color": fill, "weight": 0.55, "fillColor": fill, "fillOpacity": 0.78,
+        },
+        tooltip=folium.Tooltip(tooltip, sticky=True),
+    ).add_to(fmap)
+
+
 def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean value",
                             boundary_geojson=None):
-    """Render cell-centre-derived rectangles with a map legend and per-cell tooltips.
+    """Render clipped native-grid footprints with a legend and per-cell tooltips.
 
-    Rectangle footprints are approximate display geometries derived from the
-    returned cell-centre spacing. They are not official NASA cell polygons.
+    Footprints are approximations derived from returned cell-centre spacing.
+    They are not official NASA cell-boundary polygons. If administrative
+    boundaries are supplied, cells are retained only when their centres fall
+    within the Ghana boundary union and their display footprints are clipped
+    to that union.
     """
     if frame.empty:
         raise ValueError("No regional grid data are available for this selection")
-    lat_step, lon_step = grid_cell_bounds(frame)
+    country_geometry = _country_geometry(boundary_geojson)
+    display_frame = (
+        filter_cells_to_boundary(frame, boundary_geojson)
+        if country_geometry is not None else frame.copy()
+    )
+    if display_frame.empty:
+        raise ValueError("No returned NASA POWER cell centres fall within the Ghana boundary")
+    lat_step, lon_step = grid_cell_bounds(display_frame)
     fmap = folium.Map(
         location=[7.95, -1.05], zoom_start=6, tiles="OpenStreetMap",
         control_scale=True, prefer_canvas=True,
     )
 
     if mode == "Mean value":
-        summary = period_cell_means(frame, start_year, end_year)
+        summary = period_cell_means(display_frame, start_year, end_year)
         summary = summary[summary["mean_value"].notna()].copy()
         if summary.empty:
             raise ValueError("No valid values are available in the selected period")
@@ -66,16 +115,11 @@ def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean va
                 f"Valid months: {int(row.n_months)}<br>"
                 f"Cell centre: {row.latitude:.3f}, {row.longitude:.3f}"
             )
-            folium.Rectangle(
-                bounds=[
-                    [row.latitude - lat_step / 2, row.longitude - lon_step / 2],
-                    [row.latitude + lat_step / 2, row.longitude + lon_step / 2],
-                ],
-                color=colour, weight=0.55, fill=True, fill_color=colour,
-                fill_opacity=0.78, tooltip=folium.Tooltip(tooltip, sticky=True),
-            ).add_to(fmap)
+            _add_grid_cell(
+                fmap, row, colour, tooltip, lat_step, lon_step, country_geometry
+            )
     elif mode == "Trend evidence":
-        summary = cell_trend_table(frame, variable)
+        summary = cell_trend_table(display_frame, variable)
         if summary.empty:
             raise ValueError("No cell-level trend results could be calculated")
         for row in summary.itertuples(index=False):
@@ -91,14 +135,9 @@ def build_regional_grid_map(frame, variable, start_year, end_year, mode="Mean va
                 f"Valid years: {int(row.n_years)}<br>"
                 f"Cell centre: {row.latitude:.3f}, {row.longitude:.3f}"
             )
-            folium.Rectangle(
-                bounds=[
-                    [row.latitude - lat_step / 2, row.longitude - lon_step / 2],
-                    [row.latitude + lat_step / 2, row.longitude + lon_step / 2],
-                ],
-                color=colour, weight=0.55, fill=True, fill_color=colour,
-                fill_opacity=0.78, tooltip=folium.Tooltip(tooltip, sticky=True),
-            ).add_to(fmap)
+            _add_grid_cell(
+                fmap, row, colour, tooltip, lat_step, lon_step, country_geometry
+            )
 
         legend = """
         <div style="position:fixed;bottom:28px;left:18px;z-index:9999;background:#fff;
