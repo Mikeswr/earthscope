@@ -19,6 +19,8 @@ def main(argv=None):
         "--input-dir",
         default=str(config.data_dir() / "spatial" / "nasa_power"),
     )
+    parser.add_argument("--variables", default=",".join(config.POWER_PARAMS),
+                        help="Comma-separated variables to validate.")
     parser.add_argument("--start", type=int, default=config.POWER_START_YEAR)
     parser.add_argument("--end", type=int, default=config.latest_complete_year())
     parser.add_argument("--minimum-cell-coverage", type=float, default=0.80)
@@ -28,7 +30,11 @@ def main(argv=None):
     folder = Path(args.input_dir)
     reports = {}
     failures = []
-    for variable in config.POWER_PARAMS:
+    variables = [v.strip().upper() for v in args.variables.split(",") if v.strip()]
+    unknown = sorted(set(variables) - set(config.POWER_PARAMS))
+    if unknown:
+        parser.error("Unsupported variables: " + ", ".join(unknown))
+    for variable in variables:
         path = folder / f"ghana_power_regional_{variable}.csv"
         if not path.exists():
             reports[variable] = {
