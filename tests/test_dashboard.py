@@ -30,7 +30,7 @@ def test_synthetic_data_renders_with_warning(datadir):
     at = AppTest.from_file(APP, default_timeout=120).run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("SYNTHETIC TEST DATA" in e.value for e in at.error)
-    assert len(at.tabs) == 10
+    assert len(at.tabs) == 9
     for var in ["PRECTOTCORR", "RH2M", "T2M", "WS10M"]:
         at.selectbox[1].select(var).run()
         assert not at.exception, [e.value for e in at.exception]
