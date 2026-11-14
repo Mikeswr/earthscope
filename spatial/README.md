@@ -109,7 +109,11 @@ months are required for an annual value.
 For each native grid cell, annual compound frequency is tested using
 Mann–Kendall with the project's approximate AR(1) variance adjustment and
 Sen's slope. Benjamini–Yekutieli is the primary spatial multiple-testing
-correction; Benjamini–Hochberg is retained as a sensitivity result.
+correction; Benjamini–Hochberg is retained as a sensitivity result. A separate
+exploratory Mann–Kendall diagnostic is calculated for the unweighted mean annual
+frequency across retained grid-cell centres. That single aggregate series is
+not an area-weighted national estimate and does not replace the cell-level
+multiple-testing results.
 
 The run writes:
 - `compound_hot_dry_monthly.csv`: monthly temperature anomaly, SPI-3 and event classification.
