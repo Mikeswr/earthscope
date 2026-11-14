@@ -129,11 +129,11 @@ def parse_ndvi_history(payload, polygon_id, location, lat, lon):
 def study_polygon_name(location):
     """Stable name for an EarthScope satellite study footprint."""
     safe = "".join(ch for ch in str(location) if ch.isalnum() or ch in "-_")
-    return f"EarthScope-{safe}-30sqkm"
+    return f"EarthScope-{safe}-25sqkm"
 
 
 def find_or_create_study_polygon(location, lat, lon, **kw):
-    """Reuse a named ~30 km² polygon or create it within Agro's documented 3,000 ha limit.
+    """Reuse a named ~25 km² polygon or create it within Agro's documented 3,000 ha limit.
 
     The square is centred on the configured NASA POWER study coordinate. It is an
     analysis footprint, not an administrative city boundary.
