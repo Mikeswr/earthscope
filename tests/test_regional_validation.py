@@ -36,6 +36,8 @@ def test_missing_months_are_reported_and_never_filled():
     report = validate_regional_frame(frame, "T2M", 2020, 2021)
     assert report["status"] == "warn"
     assert report["missing_observations"] == 1
+    assert report["explicit_missing_values"] == 1
+    assert report["absent_cell_month_records"] == 0
     assert report["analysis_eligible"] is True
     assert report["minimum_cell_valid_fraction"] < 1
 
@@ -72,3 +74,13 @@ def test_mixed_variable_dataset_blocks_analysis():
     report = validate_regional_frame(frame, "T2M", 2020, 2021)
     assert report["status"] == "fail"
     assert report["analysis_eligible"] is False
+
+
+def test_absent_calendar_record_is_counted_as_missing():
+    frame = sample_frame().drop(index=0).reset_index(drop=True)
+    report = validate_regional_frame(frame, "T2M", 2020, 2021)
+    assert report["status"] == "warn"
+    assert report["missing_observations"] == 1
+    assert report["explicit_missing_values"] == 0
+    assert report["absent_cell_month_records"] == 1
+    assert report["analysis_eligible"] is True
