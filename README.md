@@ -29,7 +29,7 @@ This is a finding about estimated solar energy reaching the surface. It is not a
 - Compare annual series, anomalies, quality-control flags, trend estimates and evidence classes.
 - View point-level trend comparisons on a map.
 - Explore a separate Future Outlook module with rolling-origin model comparison, monthly forecasts and empirical uncertainty bands.
-- Check current weather through OpenWeather and Agromonitoring, with recent hourly history where the configured account permits it.
+- Check current weather through OpenWeather and Agromonitoring, with recent hourly history where the configured account permits it.\n- Explore available Agromonitoring satellite scenes for selected study footprints, including true colour, false colour, NDVI, EVI, EVI2 and NDWI products where returned by the API.
 
 ## Data sources and interpretation
 
