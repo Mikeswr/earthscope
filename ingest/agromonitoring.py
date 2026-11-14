@@ -13,7 +13,9 @@ Endpoints (base https://api.agromonitoring.com/agro/1.0):
                           (Landsat 8 and Sentinel-2); older archive may need a higher plan
 """
 import math
+from urllib.parse import urlparse
 
+import requests
 import pandas as pd
 
 from earthscope import config
@@ -122,3 +124,96 @@ def parse_ndvi_history(payload, polygon_id, location, lat, lon):
         df = df.drop_duplicates(["date", "satellite"])
     df.attrs["entries_skipped_without_data"] = skipped
     return df
+
+
+def study_polygon_name(location):
+    """Stable name for an EarthScope satellite study footprint."""
+    safe = "".join(ch for ch in str(location) if ch.isalnum() or ch in "-_")
+    return f"EarthScope-{safe}-30sqkm"
+
+
+def find_or_create_study_polygon(location, lat, lon, **kw):
+    """Reuse a named ~30 km² polygon or create it within Agro's documented 3,000 ha limit.
+
+    The square is centred on the configured NASA POWER study coordinate. It is an
+    analysis footprint, not an administrative city boundary.
+    """
+    name = study_polygon_name(location)
+    polygons = list_polygons(**kw)
+    if not isinstance(polygons, list):
+        raise ValueError("Agromonitoring polygon list was not a list")
+    existing = next((p for p in polygons if p.get("name") == name and p.get("id")), None)
+    if existing:
+        return existing
+    # 5.477 km x 5.477 km = approximately 3,000 ha (30 km²).
+    half_side_m = math.sqrt(30_000_000.0) / 2.0
+    created = create_polygon(name, square_polygon(float(lat), float(lon), half_side_m), **kw)
+    if not isinstance(created, dict) or not created.get("id"):
+        raise ValueError("Agromonitoring did not return an ID for the study polygon")
+    return created
+
+
+def search_satellite_images(polygon_id, start_unix, end_unix, **kw):
+    """Search available satellite scenes for a polygon (Sentinel-2/Landsat as returned)."""
+    payload = http.call(
+        "GET", f"{BASE}/image/search", secret=_key(),
+        params={"polyid": polygon_id, "start": int(start_unix), "end": int(end_unix)},
+        **kw,
+    )[1]
+    if not isinstance(payload, list):
+        raise ValueError("Agromonitoring satellite search response was not a list")
+    return sorted(
+        [scene for scene in payload if isinstance(scene, dict) and scene.get("image")],
+        key=lambda scene: int(scene.get("dt", 0)),
+        reverse=True,
+    )
+
+
+def _fetch_product_url(url, timeout=45):
+    """Fetch an API-provided image/stat URL server-side so app credentials stay off the map."""
+    parsed = urlparse(str(url))
+    if parsed.scheme not in ("http", "https") or not (
+        parsed.hostname == "agromonitoring.com" or
+        (parsed.hostname and parsed.hostname.endswith(".agromonitoring.com"))
+    ):
+        raise ValueError("Agromonitoring returned an unexpected product host")
+    try:
+        response = requests.get(url, timeout=timeout)
+    except requests.RequestException:
+        raise RuntimeError("Could not retrieve the Agromonitoring satellite product") from None
+    if response.status_code >= 400:
+        raise RuntimeError(f"Agromonitoring satellite product returned HTTP {response.status_code}")
+    return response
+
+
+def fetch_satellite_image(scene, product="truecolor"):
+    """Return PNG bytes for one available scene product without exposing the API URL."""
+    allowed = {"truecolor", "falsecolor", "ndvi", "evi", "evi2", "nri", "dswi", "ndwi"}
+    if product not in allowed:
+        raise ValueError(f"Unsupported satellite product: {product}")
+    url = (scene.get("image") or {}).get(product)
+    if not url:
+        raise ValueError(f"{product.upper()} is not available for this satellite scene")
+    response = _fetch_product_url(url)
+    content_type = response.headers.get("Content-Type", "").lower()
+    if not content_type.startswith("image/") and not response.content.startswith(b"\\x89PNG"):
+        raise ValueError("Agromonitoring image endpoint did not return an image")
+    return response.content
+
+
+def fetch_satellite_stats(scene, product="ndvi"):
+    """Return zonal index statistics for a scene when the provider supplies them."""
+    allowed = {"ndvi", "evi", "evi2", "nri", "dswi", "ndwi"}
+    if product not in allowed:
+        raise ValueError(f"Statistics are not available for {product}")
+    url = (scene.get("stats") or {}).get(product)
+    if not url:
+        return None
+    response = _fetch_product_url(url)
+    try:
+        payload = response.json()
+    except ValueError:
+        raise ValueError("Agromonitoring statistics response was not valid JSON") from None
+    if not isinstance(payload, dict):
+        raise ValueError("Agromonitoring statistics response was not an object")
+    return payload
