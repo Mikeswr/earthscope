@@ -5,3 +5,5 @@ Retrieve NASA POWER regional monthly T2M and PRECTOTCORR for 1981-2025, validate
 The workflow retains source grids, quality-control results, boundary provenance, monthly indicators, annual frequencies, cell-level trend results, and run metadata in a GitHub Actions artifact.
 
 Retry request: repeat the initial run after fixing the Python package import path.
+
+Second reproducibility execution: regenerate all outputs including annual summaries, cell summaries, centroid GeoJSON, and the exploratory domain-level Mann-Kendall diagnostic.
