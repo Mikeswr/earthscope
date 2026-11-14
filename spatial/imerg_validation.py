@@ -125,7 +125,10 @@ def _validate_power(power, grid, start, end):
         raise ValueError("POWER data lack expected grid cells: " + ", ".join(missing_cells[:10]))
     p = p[p["cell_id"].isin(expected)].copy()
     coordinates = grid.set_index("cell_id")[["latitude", "longitude"]]
-    p = p.join(coordinates, on="cell_id", rsuffix="_grid")
+    p = p.merge(
+        coordinates.reset_index(), on="cell_id", how="left",
+        validate="many_to_one", suffixes=("", "_grid")
+    )
     coord_mismatch = (
         (p["latitude"] - p["latitude_grid"]).abs().gt(1e-4)
         | (p["longitude"] - p["longitude_grid"]).abs().gt(1e-4)
@@ -165,7 +168,10 @@ def _validate_imerg(imerg, grid, start, end):
         absent = sorted(set(grid["cell_id"]) - set(g["cell_id"].dropna()))
         raise ValueError("IMERG export is missing reference cells: " + ", ".join(absent[:10]))
     coordinates = grid.set_index("cell_id")[["latitude", "longitude"]]
-    g = g.join(coordinates, on="cell_id", rsuffix="_grid")
+    g = g.merge(
+        coordinates.reset_index(), on="cell_id", how="left",
+        validate="many_to_one", suffixes=("", "_grid")
+    )
     coord_mismatch = (
         (g["latitude"] - g["latitude_grid"]).abs().gt(1e-4)
         | (g["longitude"] - g["longitude_grid"]).abs().gt(1e-4)
@@ -173,7 +179,7 @@ def _validate_imerg(imerg, grid, start, end):
     if coord_mismatch.any():
         raise ValueError("IMERG export coordinates do not match the POWER support grid.")
     if g["precipitation_mean"].dropna().lt(0).any():
-        raise ValueError("IMERG precipitation rates contain negative values.")
+        raise ValueError("IMERG precipitation contains negative precipitation rates.")
     if g["precipitation_count"].dropna().lt(0).any():
         raise ValueError("IMERG valid-pixel counts cannot be negative.")
     populated = g["precipitation_mean"].notna()
