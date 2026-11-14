@@ -99,3 +99,54 @@ Basic physical bounds are applied to precipitation, relative humidity, wind spee
 ### Interpretation and status
 
 Forecasts are experimental outlooks for five NASA POWER grid-cell time series, not Ghana-wide climate projections. The model comparison and forecast outputs must be checked by running the automated tests and inspecting backtest diagnostics on the supplied real dataset before communicating any substantive future result. Forecasts are not mixed into the historical trend significance calculations. The current module does not use OpenWeather or Agromonitoring observations as training data.
+
+
+## 12. Experimental compound hot-dry climate indicator
+
+The regional analysis uses two monthly NASA POWER meteorological parameters on their returned native cell grid: T2M (2 m air temperature, °C) and PRECTOTCORR (bias-corrected precipitation rate, mm/day). The NASA POWER Monthly API documentation identifies the meteorological archive as MERRA-2 based from 1981 onward. Cell coordinates are preserved; no spatial interpolation or resampling is performed.
+
+### Temperature anomaly
+
+For each cell and calendar month, T2M is standardised relative to the 1991–2020 baseline:
+`z_T = (T2M - monthly climatological mean) / monthly climatological standard deviation`.
+At least 20 valid baseline values are required for each calendar month. The hot-condition threshold is `z_T >= +1.0`, indicating an unusually warm monthly mean relative to that cell's calendar-month baseline. It is not a daily heatwave definition.
+
+### SPI-3 precipitation deficit
+
+PRECTOTCORR is a monthly mean daily precipitation rate. It is converted to an approximate monthly accumulation by multiplying the rate by the number of calendar days in that month. A trailing three-month sum is then calculated; all three months must be valid.
+
+For each ending calendar month, the 1991–2020 SPI-3 baseline values are fitted to a two-parameter gamma distribution with location fixed at zero. The empirical probability of zero precipitation is included as a zero-mass adjustment. The cumulative probability is transformed to a standard normal score. A minimum of 20 baseline values per ending calendar month is required. The dry-condition threshold is `SPI-3 <= -1.0`.
+
+This follows the common SPI approach of fitting a probability distribution to accumulated precipitation and transforming its cumulative probability to the standard normal distribution. The exact fitting choices and baseline are recorded in the run metadata.
+
+### Compound event and annual frequency
+
+A month is classified as compound hot-dry only when both conditions are met in the same cell and month: `z_T >= +1.0` and `SPI-3 <= -1.0`. A month is unclassified when either input indicator is missing. Missing months are never converted to non-events.
+
+Annual compound frequency is the percentage of classifiable months in that calendar year that meet both conditions. At least 9 classifiable months are required; otherwise the annual frequency remains missing.
+
+### Spatial trend and multiple testing
+
+The two-sided Mann-Kendall test is applied to each cell's annual compound frequency. The Sen slope is reported as percentage-point change per decade. The existing minimum of 10 valid years and 70% year coverage is retained, and the annual variance is adjusted using the project's approximate lag-1 AR(1) effective-sample-size method.
+
+Benjamini-Yekutieli (BY) adjusted p-values are the primary spatial evidence classification because they are valid under general dependence among tests, albeit conservative. Benjamini-Hochberg (BH) adjusted p-values are retained as a sensitivity comparison. Raw p-values and both adjusted values remain in the output table.
+
+### Quality control and traceability
+
+Before analysis, the regional grid validator checks required columns, cell-month uniqueness, coordinate consistency, units, broad physical bounds, valid observation counts and cell-level coverage. Missing observations and absent cell-month records are reported separately. Duplicate keys and implausible values block analysis. A cell below the configured coverage threshold is not eligible for the primary run.
+
+The run package retains the input file hashes, source request metadata, boundary file hash, validation report, processing parameters, per-cell diagnostics, monthly indicators, annual frequencies and trend table.
+
+### Interpretation limits
+
+- The indicator is retrospective. It does not yet issue forecasts or warning lead times.
+- SPI-3 describes precipitation deficits, not root-zone soil moisture or evaporative demand.
+- The temperature component is a monthly anomaly, not a daily extreme-temperature or human heat-stress index.
+- A joint hot-dry classification is a statistical co-occurrence indicator, not an estimate of crop loss, health impact, fire risk or water-supply impact.
+- NASA POWER is a gridded estimate, not a station observation. Spatial resolution is retained as returned and can vary by source product.
+- The Ghana country boundary is used to select grid-cell centres. It is not the spatial measurement unit.
+- The result requires comparison with independent precipitation products and, where available, station observations before operational use.
+
+## 13. Independent precipitation validation pathway
+
+The planned precipitation cross-check uses NASA GPM IMERG Final Run monthly precipitation over the common period beginning in 1998. IMERG has a 0.1° grid and a 30-minute base sampling interval, with monthly products also available. IMERG and POWER have different retrieval methods, grid spacing and error characteristics; they will be compared after transparent spatial and temporal aggregation to a common support. They will not be merged as if they were one homogeneous record.
