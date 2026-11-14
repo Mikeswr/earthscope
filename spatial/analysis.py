@@ -45,7 +45,12 @@ def cell_trend_table(frame, variable, alpha=0.05, fdr_method="bh"):
         group = group.sort_values("date")
         values = group.set_index("date")["value"]
         if values.index.has_duplicates:
-            values = values.groupby(level=0).mean()
+            duplicate_dates = values.index[values.index.duplicated()].unique()
+            preview = ", ".join(pd.Timestamp(x).strftime("%Y-%m") for x in duplicate_dates[:5])
+            raise ValueError(
+                f"Duplicate cell-month records for {cell_id} ({preview}). "
+                "Resolve the ingestion issue before trend analysis; records are never averaged silently."
+            )
         if values.empty:
             continue
         monthly = values.reindex(
