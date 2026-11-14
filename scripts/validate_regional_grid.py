@@ -6,6 +6,10 @@ Usage:
 import argparse
 import json
 from pathlib import Path
+import sys
+
+# Match the repository's existing regional downloader package resolution.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pandas as pd
 
