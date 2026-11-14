@@ -1,0 +1,83 @@
+name: NASA POWER and GPM IMERG cross-product comparison
+
+on:
+  push:
+    paths:
+      - "data/spatial/imerg/earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv"
+      - "data/reference/ghana_power_grid_cells_2007_adm0.csv"
+      - "spatial/imerg_validation.py"
+      - "scripts/compare_power_imerg.py"
+      - ".github/workflows/imerg-cross-product-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: earthscope-imerg-cross-product-validation
+  cancel-in-progress: false
+
+jobs:
+  compare-precipitation-products:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out EarthScope
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install comparison dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy pandas scipy requests pyyaml python-dotenv
+
+      - name: Check that the IMERG export is present
+        run: |
+          test -s data/spatial/imerg/earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv
+          test -s data/reference/ghana_power_grid_cells_2007_adm0.csv
+
+      - name: Retrieve matching NASA POWER precipitation archive
+        run: |
+          python -m scripts.fetch_power_regional \
+            --variables PRECTOTCORR \
+            --start 1998 \
+            --end 2025 \
+            --output-dir /tmp/earthscope-nasa-power-common-period
+
+      - name: Validate NASA POWER regional grid
+        run: |
+          python -m scripts.validate_regional_grid \
+            --input-dir /tmp/earthscope-nasa-power-common-period \
+            --variables PRECTOTCORR \
+            --start 1998 \
+            --end 2025 \
+            --minimum-cell-coverage 0.80 \
+            --output /tmp/earthscope-nasa-power-common-period/regional_validation.json
+
+      - name: Compare IMERG and POWER on matched grid-cell support
+        run: |
+          python -m scripts.compare_power_imerg \
+            --power-csv /tmp/earthscope-nasa-power-common-period/ghana_power_regional_PRECTOTCORR.csv \
+            --imerg-csv data/spatial/imerg/earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv \
+            --grid-csv data/reference/ghana_power_grid_cells_2007_adm0.csv \
+            --output-dir reports/imerg_validation \
+            --start 1998-01-01 \
+            --end 2025-09-01 \
+            --minimum-cell-coverage 0.80
+
+      - name: Upload IMERG cross-product assessment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: earthscope-imerg-power-cross-product-assessment
+          path: |
+            reports/imerg_validation/
+            /tmp/earthscope-nasa-power-common-period/fetch_metadata.json
+            /tmp/earthscope-nasa-power-common-period/regional_validation.json
+          if-no-files-found: warn
+          retention-days: 90
