@@ -115,6 +115,9 @@ The run writes:
 - `compound_hot_dry_monthly.csv`: monthly temperature anomaly, SPI-3 and event classification.
 - `compound_hot_dry_annual_frequency.csv`: annual percentage and valid-month count by cell.
 - `compound_hot_dry_cell_trends.csv`: per-cell Sen slope, confidence interval, raw p-value, BY/BH adjusted p-values and evidence classes.
+- `compound_hot_dry_annual_summary.csv`: annual event counts, number of grid cells with events and unweighted cell-frequency summaries.
+- `compound_hot_dry_cell_summary.csv`: event counts, assessed years, frequency summaries and trend evidence by grid cell.
+- `compound_hot_dry_cell_centres.geojson`: point features at returned grid-cell centres. These are not official grid-cell polygons or station locations.
 - `analysis_run.json`: input hashes, quality-control summaries, boundary provenance, analysis parameters and output counts.
 - `ghana_adm0_boundary.geojson`: the boundary geometry used for cell-centre selection.
 
