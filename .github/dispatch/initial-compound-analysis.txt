@@ -1,0 +1,5 @@
+Initial execution request for EarthScope.
+
+Retrieve NASA POWER regional monthly T2M and PRECTOTCORR for 1981-2025, validate the complete Ghana regional grids, and run the retrospective compound hot-dry analysis using the documented 1991-2020 baseline.
+
+The workflow retains source grids, quality-control results, boundary provenance, monthly indicators, annual frequencies, cell-level trend results, and run metadata in a GitHub Actions artifact.
