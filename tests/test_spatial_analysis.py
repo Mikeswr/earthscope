@@ -49,3 +49,14 @@ def test_grid_cell_footprints_use_returned_coordinate_spacing():
     lat_spacing, lon_spacing = grid_cell_bounds(frame)
     assert lat_spacing == 0.5
     assert lon_spacing == 0.5
+
+
+def test_duplicate_cell_months_are_rejected_not_averaged():
+    frame = sample_grid()
+    frame = pd.concat([frame, frame.iloc[[0]]], ignore_index=True)
+    try:
+        cell_trend_table(frame, "T2M")
+    except ValueError as exc:
+        assert "Duplicate cell-month records" in str(exc)
+    else:
+        raise AssertionError("Duplicate cell-month records must block trend analysis")
