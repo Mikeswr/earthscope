@@ -145,8 +145,8 @@ def find_or_create_study_polygon(location, lat, lon, **kw):
     existing = next((p for p in polygons if p.get("name") == name and p.get("id")), None)
     if existing:
         return existing
-    # 5.477 km x 5.477 km = approximately 3,000 ha (30 km²).
-    half_side_m = math.sqrt(30_000_000.0) / 2.0
+    # 5 km x 5 km = approximately 2,500 ha (25 km²), below the documented 3,000 ha ceiling.
+    half_side_m = 2_500.0
     created = create_polygon(name, square_polygon(float(lat), float(lon), half_side_m), **kw)
     if not isinstance(created, dict) or not created.get("id"):
         raise ValueError("Agromonitoring did not return an ID for the study polygon")
