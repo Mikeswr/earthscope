@@ -188,3 +188,94 @@ Limitations to retain in any presentation:
 
 EarthScope is a NASA-data-based research prototype. It is not a NASA
 programme, partnership, endorsement, or operational warning service.
+
+
+## GPM IMERG precipitation cross-product assessment
+
+EarthScope includes a matched-support comparison between NASA POWER PRECTOTCORR
+and NASA GPM IMERG Final monthly V07. The common research-quality period is
+January 1998 to September 2025. NASA's V07 Final record ends in September 2025
+while IMERG V08 Final reprocessing is in transition; do not append V07 Late/Early
+or V08 values to this series without a separate, version-aware analysis.
+
+### 1. Export the IMERG monthly values
+
+Open the Earth Engine Code Editor at https://code.earthengine.google.com and
+copy and run `scripts/earth_engine/export_imerg_power_support.js`.
+
+The script samples the GPM monthly collection
+`NASA/GPM_L3/IMERG_MONTHLY_V07` over the same 61 approximate POWER cell
+rectangles retained in the first Ghana compound-analysis run. The rectangles
+are inferred from the 0.5-degree latitude and 0.625-degree longitude spacing
+of returned POWER cell centres. They are not official NASA POWER cell
+polygons. The export retains valid-pixel counts, gauge-relative weighting,
+precipitation quality index and random-error diagnostics.
+
+The script creates two Google Drive exports in the `EarthScope_GPM` folder:
+- `earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv`
+- A one-row export manifest describing the collection, interval, grid and unit conversion.
+
+In the Earth Engine Tasks tab, run both export tasks. Download the CSV and
+place it at:
+
+`data/spatial/imerg/earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv`
+
+The Earth Engine project must be registered for Earth Engine access.
+
+### 2. Run the comparison
+
+The comparison workflow retrieves the NASA POWER precipitation archive for
+the same period and then runs the matched-support comparison:
+
+```bash
+python -m scripts.fetch_power_regional --variables PRECTOTCORR --start 1998 --end 2025
+python -m scripts.validate_regional_grid --variables PRECTOTCORR --start 1998 --end 2025
+python -m scripts.compare_power_imerg
+```
+
+The workflow `.github/workflows/imerg-cross-product-validation.yml` automates
+those steps after the IMERG CSV is committed to the path above. It publishes
+the matched monthly pairs, cell metrics, seasonal metrics, standardised anomaly
+metrics, complete annual comparisons, coverage checks and a Markdown report
+as a GitHub Actions artifact.
+
+### Unit and support harmonisation
+
+- POWER PRECTOTCORR is a monthly mean daily rate in mm/day. Monthly accumulation
+  is calculated as rate multiplied by the calendar days in that month.
+- The IMERG monthly precipitation band is in mm/hr. Monthly accumulation is
+  calculated as rate multiplied by the actual number of hours in that month.
+- IMERG pixel values are averaged within each approximate POWER cell rectangle
+  before comparison, so the two products are compared on matched approximate
+  spatial support rather than point samples.
+- Missing cell-month pairs are retained as missing and excluded pairwise from
+  metrics. No interpolation or imputation is applied.
+- IMERG pixel counts, gauge-relative weighting, precipitation quality index
+  and random error are retained as diagnostics. They are not used as arbitrary
+  exclusion thresholds.
+
+### Interpretation limits
+
+This is a cross-product consistency assessment, not independent station
+validation. IMERG Final includes monthly GPCC gauge adjustment. POWER
+PRECTOTCORR uses observationally corrected MERRA-2 precipitation forcing;
+over continental Africa, the forcing uses the CMAP gauge-satellite product.
+The products have distinct processing chains, but both are gauge-informed.
+The comparison must not be presented as a fully independent validation of
+either product.
+
+The POWER grid rectangles are approximate inferred footprints, and GPM's
+native 0.1-degree grid is coarsened to those supports using an area mean. The
+spatial aggregation does not create additional information in the coarser
+POWER grid. Metrics are reported per cell and season. Pooled cell-month
+statistics are descriptive only because time steps and neighbouring cells
+are dependent.
+
+### Product references
+
+- GPM IMERG Final Monthly V07: DOI 10.5067/GPM/IMERG/3B-MONTH/07
+- Earth Engine collection: `NASA/GPM_L3/IMERG_MONTHLY_V07`
+- NASA GPM V08 transition notice: V07 Final ends in September 2025 pending
+  the V08 Final retrospective processing.
+- NASA POWER meteorology data source documentation: MERRA-2 precipitation
+  over land incorporates observationally corrected precipitation forcing.
