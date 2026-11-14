@@ -238,3 +238,58 @@ def test_probe_flags_a_200_with_the_wrong_shape_as_unusable(monkeypatch):
     report = check_apis.run_probes()
     cur = [r for r in report["results"] if r["endpoint"] == "current_weather_2.5"][0]
     assert cur["http_status"] == 200 and cur["usable"] is False and "FAILED" in cur["parser_check"]
+
+
+def test_satellite_polygon_reuse_and_create_within_area_limit(monkeypatch):
+    calls = route(monkeypatch, lambda m, u, p: Resp([] if m == "GET" else {"id": "new-poly"}, 201 if m == "POST" else 200))
+    poly = agro.find_or_create_study_polygon("Accra", 5.618, -0.171)
+    assert poly["id"] == "new-poly"
+    post = next(c for c in calls if c["method"] == "POST")
+    coords = post["json"]["geo_json"]["geometry"]["coordinates"][0]
+    assert coords[0] == coords[-1]
+    # 5 km x 5 km square = 2,500 ha, below the documented 3,000 ha maximum.
+    lat_span = max(p[1] for p in coords) - min(p[1] for p in coords)
+    assert 0.044 < lat_span < 0.046
+    calls = route(monkeypatch, lambda m, u, p: Resp([{"id": "existing", "name": agro.study_polygon_name("Accra")}]))
+    poly = agro.find_or_create_study_polygon("Accra", 5.618, -0.171)
+    assert poly["id"] == "existing" and len(calls) == 1
+
+
+def test_satellite_search_request_and_scene_sort(monkeypatch):
+    calls = route(monkeypatch, lambda m, u, p: Resp([
+        {"dt": 1704153600, "image": {"ndvi": "https://api.agromonitoring.com/image/1.0/a/b?appid=secret"}},
+        {"dt": 1704067200, "image": {"truecolor": "https://api.agromonitoring.com/image/1.0/c/d?appid=secret"}},
+        {"dt": 1704000000},
+    ]))
+    scenes = agro.search_satellite_images("poly1", 1704000000, 1705000000)
+    assert [s["dt"] for s in scenes] == [1704153600, 1704067200]
+    assert calls[0]["url"].endswith("/agro/1.0/image/search")
+    assert calls[0]["params"]["polyid"] == "poly1" and calls[0]["params"]["start"] == 1704000000
+
+
+def test_satellite_image_fetch_is_server_side_and_host_restricted(monkeypatch):
+    class ImageResponse:
+        status_code = 200
+        headers = {"Content-Type": "image/png"}
+        content = b"\\x89PNG\\r\\n"
+    calls = []
+    monkeypatch.setattr(agro.requests, "get", lambda url, timeout: (calls.append(url) or ImageResponse()))
+    scene = {"image": {"ndvi": "https://api.agromonitoring.com/image/1.0/a/b?appid=secret"}}
+    assert agro.fetch_satellite_image(scene, "ndvi") == ImageResponse.content
+    assert len(calls) == 1 and "appid=secret" in calls[0]
+    with pytest.raises(ValueError, match="unexpected product host"):
+        agro.fetch_satellite_image({"image": {"ndvi": "https://evil.example/image?appid=secret"}}, "ndvi")
+    with pytest.raises(ValueError, match="not available"):
+        agro.fetch_satellite_image({"image": {}}, "ndvi")
+
+
+def test_satellite_stats_fetch_and_invalid_json(monkeypatch):
+    class StatsResponse:
+        status_code = 200
+        headers = {"Content-Type": "application/json"}
+        def json(self):
+            return {"mean": 0.62, "median": 0.64}
+    monkeypatch.setattr(agro.requests, "get", lambda url, timeout: StatsResponse())
+    scene = {"stats": {"ndvi": "https://api.agromonitoring.com/stats/1.0/a/b?appid=secret"}}
+    assert agro.fetch_satellite_stats(scene, "ndvi")["mean"] == 0.62
+    assert agro.fetch_satellite_stats({"stats": {}}, "ndvi") is None
