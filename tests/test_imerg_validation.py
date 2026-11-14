@@ -75,7 +75,7 @@ def test_missing_imerg_months_are_not_filled_and_reduce_coverage():
     result = compare_power_imerg(power, imerg, grid, "2000-01-01", "2001-12-01")
     coverage = result["coverage"].set_index("cell_id")
     assert coverage.loc["6.0000_-1.0000", "valid_months"] == 19
-    assert coverage.loc["6.0000_-1.0000", "eligible_at_coverage_threshold"] is False
+    assert coverage.loc["6.0000_-1.0000", "eligible_at_coverage_threshold"] == False
     assert len(result["paired_monthly"]) == 43
     assert result["metadata"]["analysis_eligible"] is False
 
@@ -97,7 +97,7 @@ def test_mismatched_cell_coordinates_are_rejected():
 def test_negative_imerg_precipitation_is_rejected():
     power, imerg, grid = fixture_frames()
     imerg.loc[0, "precipitation_mean"] = -1
-    with pytest.raises(ValueError, match="negative precipitation"):
+    with pytest.raises(ValueError, match="negative precipitation rates"):
         compare_power_imerg(power, imerg, grid, "2000-01-01", "2001-12-01")
 
 
@@ -115,5 +115,5 @@ def test_comparison_writer_saves_reproducible_outputs(tmp_path):
     assert "metadata" in outputs and "report" in outputs
     assert (tmp_path / "imerg_power_comparison_metadata.json").exists()
     report = (tmp_path / "imerg_power_comparison_report.md").read_text()
-    assert "Cross-product consistency assessment" in report
-    assert "not independent station validation" not in report.lower() or "not independent station validation" in report.lower()
+    assert "cross-product assessment" in report.lower()
+    assert "not independent station validation" in report.lower()
