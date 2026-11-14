@@ -82,3 +82,47 @@ Cell rectangles are approximate display footprints inferred from returned
 cell-centre spacing and clipped to Ghana administrative boundaries. They are
 not official NASA cell polygons. The dashboard does not interpolate between
 cells or treat an administrative district as the measurement unit.
+
+
+## Experimental compound hot-dry analysis
+
+A separate retrospective climate-stress pathway combines monthly T2M and
+PRECTOTCORR values on their common native NASA POWER grid cells. It does not
+change the existing five-location trend pipeline.
+
+Run after downloading the two required variables:
+
+```bash
+python -m scripts.fetch_power_regional --variables T2M,PRECTOTCORR --start 1981 --end 2025
+python -m scripts.validate_regional_grid --variables T2M,PRECTOTCORR --start 1981 --end 2025
+python -m scripts.run_compound_analysis --start 1981 --end 2025
+```
+
+The compound engine standardises T2M by calendar month against 1991–2020,
+calculates trailing three-month precipitation totals from the monthly mean
+daily precipitation rate, fits a zero-adjusted gamma distribution for SPI-3
+separately for each ending calendar month, and flags months with T2M z-score
+at least +1 and SPI-3 at or below -1. Annual frequency is the percentage of
+classifiable months that meet both conditions. At least nine classifiable
+months are required for an annual value.
+
+For each native grid cell, annual compound frequency is tested using
+Mann–Kendall with the project's approximate AR(1) variance adjustment and
+Sen's slope. Benjamini–Yekutieli is the primary spatial multiple-testing
+correction; Benjamini–Hochberg is retained as a sensitivity result.
+
+The run writes:
+- `compound_hot_dry_monthly.csv`: monthly temperature anomaly, SPI-3 and event classification.
+- `compound_hot_dry_annual_frequency.csv`: annual percentage and valid-month count by cell.
+- `compound_hot_dry_cell_trends.csv`: per-cell Sen slope, confidence interval, raw p-value, BY/BH adjusted p-values and evidence classes.
+- `analysis_run.json`: input hashes, quality-control summaries, boundary provenance, analysis parameters and output counts.
+- `ghana_adm0_boundary.geojson`: the boundary geometry used for cell-centre selection.
+
+The workflow `.github/workflows/compound-climate-stress.yml` can retrieve the
+1981–2025 T2M and PRECTOTCORR regional grids, validate them, run the compound
+analysis and publish the outputs as a GitHub Actions artifact.
+
+This product is an experimental retrospective indicator. It is not a
+heatwave definition, an impact model, a soil-moisture drought index, or an
+operational forecast. A later validation stage should compare precipitation
+behaviour against NASA GPM IMERG over their common period from 1998 onward.
