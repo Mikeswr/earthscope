@@ -88,18 +88,18 @@ export default function Home() {
       <section className="signal-section" id="method">
         <div className="signal-inner shell">
           <div className="signal-copy">
-            <div className="eyebrow"><span className="pulse" /> A FEATURED RESEARCH SIGNAL</div>
-            <h2>What is happening<br />to surface solar energy?</h2>
-            <p>In the NASA POWER monthly record for the Accra grid point, EarthScope's documented analysis identified a statistically significant declining trend in estimated all-sky surface shortwave solar energy from 1984 to 2025.</p>
-            <a className="text-link light-link" href={dashboardUrl} target="_blank" rel="noreferrer">Explore the evidence <span>↗</span></a>
+            <div className="eyebrow"><span className="pulse" /> FROM OBSERVATION TO EVIDENCE</div>
+            <h2>Find the trend.<br />Test the signal.</h2>
+            <p>EarthScope is designed to distinguish persistent environmental change from short-term variability. Each result should be read alongside its data source, period of record, statistical significance and known limitations.</p>
+            <a className="text-link light-link" href={dashboardUrl} target="_blank" rel="noreferrer">Explore the current analysis <span>↗</span></a>
           </div>
           <div className="signal-stat">
-            <div className="stat-label">ESTIMATED CHANGE PER DECADE</div>
-            <div className="stat-value">−0.0514</div>
-            <div className="stat-unit">kWh/m²/day</div>
+            <div className="stat-label">THE ANALYSIS WORKFLOW</div>
+            <div className="stat-value">Data <span style={{color:"#69c6b5"}}>→</span> Trend</div>
+            <div className="stat-unit">Evidence before interpretation</div>
             <div className="stat-rule" />
-            <div className="stat-meta"><span>1984–2025</span><span>Accra grid point</span></div>
-            <div className="stat-caveat">A gridded estimate, not a direct measurement of solar-panel output. The signal requires independent validation against ground-based radiation observations.</div>
+            <div className="stat-meta"><span>QUALITY CONTROL</span><span>UNCERTAINTY</span></div>
+            <div className="stat-caveat">No illustrative value is presented as a measured result. Numerical findings belong in the dashboard with their selected location, parameter and analysis period.</div>
           </div>
         </div>
       </section>
