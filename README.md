@@ -29,7 +29,8 @@ This is a finding about estimated solar energy reaching the surface. It is not a
 - Compare annual series, anomalies, quality-control flags, trend estimates and evidence classes.
 - View point-level trend comparisons on a map.
 - Explore a separate Future Outlook module with rolling-origin model comparison, monthly forecasts and empirical uncertainty bands.
-- Check current weather through OpenWeather and Agromonitoring, with recent hourly history where the configured account permits it.\n- Explore available Agromonitoring satellite scenes for selected study footprints, including true colour, false colour, NDVI, EVI, EVI2 and NDWI products where returned by the API.
+- Check current weather through OpenWeather and Agromonitoring, with recent hourly history where the configured account permits it.
+- Explore available Agromonitoring satellite scenes for selected study footprints, including true colour, false colour, NDVI, EVI, EVI2 and NDWI products where returned by the API.\n- Explore available Agromonitoring satellite scenes for selected study footprints, including true colour, false colour, NDVI, EVI, EVI2 and NDWI products where returned by the API.
 
 ## Data sources and interpretation
 
@@ -47,7 +48,9 @@ Set OPENWEATHER_API_KEY in Streamlit Community Cloud secrets or as a local envir
 
 ### Agromonitoring
 
-The dashboard provides current weather and a recent hourly history view. A request for January 2020 returned HTTP 400, requested data is out of allowed range, under the tested account. Older archive access is therefore not claimed.
+The dashboard provides current weather and a recent hourly history view. A request for January 2020 returned HTTP 400, requested data is out of allowed range, under the tested account. Older weather archive access is therefore not claimed.
+
+The Satellite imagery tab uses Agromonitoring's two-step imagery API: it prepares or reuses a named 25 km² square study polygon centred on the selected EarthScope coordinate, searches for available scenes, and retrieves the returned image products and vegetation-index statistics server-side. The footprint is an analytical square, not an official administrative boundary. Agromonitoring imagery coverage varies by place, acquisition date, cloud cover and account entitlement. No live satellite imagery endpoint is claimed verified until tested against the deployed key. Imagery and indices remain separate from NASA POWER trend calculations.
 
 Set AGROMONITORING_API_KEY only if using this separate client. Keep its outputs separate from NASA POWER climate-trend calculations.
 
