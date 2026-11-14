@@ -32,7 +32,8 @@ def test_summaries_preserve_cells_and_count_annual_events():
     assert meta["n_grid_cells"] == 2
     assert "not an area-weighted national estimate" in meta["spatial_inference"]
     assert meta["domain_aggregate_trend"]["n_valid_years"] == 2
-    assert meta["domain_aggregate_trend"]["mann_kendall_p"] is not None
+    assert meta["domain_aggregate_trend"]["trend_direction"] == "insufficient_data"
+    assert meta["domain_aggregate_trend"]["mann_kendall_p"] is None
     assert meta["domain_aggregate_trend"]["autocorrelation_method"].startswith("AR(1)")
 
 
@@ -51,3 +52,22 @@ def test_summaries_reject_duplicate_cell_year_records():
     d = pd.concat([d, d.iloc[[0]]], ignore_index=True)
     with pytest.raises(ValueError, match="Duplicate cell-year"):
         summarise_compound_outputs(d, pd.DataFrame())
+
+
+def test_aggregate_trend_runs_when_minimum_year_threshold_is_met():
+    rows = []
+    for year in range(2000, 2015):
+        for cell_id, lat, lon, count in [
+            ("c1", 6.0, -1.0, (year - 2000) % 3),
+            ("c2", 6.5, -1.5, (year - 2000) % 4),
+        ]:
+            rows.append({
+                "year": year, "cell_id": cell_id, "latitude": lat, "longitude": lon,
+                "n_months_assessed": 12, "n_hot_dry_months": count,
+                "hot_dry_frequency_pct": 100 * count / 12,
+            })
+    annual, cells, geojson, meta = summarise_compound_outputs(pd.DataFrame(rows), pd.DataFrame())
+    diagnostic = meta["domain_aggregate_trend"]
+    assert diagnostic["n_valid_years"] == 15
+    assert diagnostic["mann_kendall_p"] is not None
+    assert diagnostic["sen_slope_percentage_points_per_decade"] is not None
