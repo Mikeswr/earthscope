@@ -57,6 +57,9 @@ def validate_regional_frame(
         "expected_months_per_cell": (end_year - start_year + 1) * 12,
         "valid_observations": 0,
         "missing_observations": 0,
+        "explicit_missing_values": 0,
+        "absent_cell_month_records": 0,
+        "recorded_cell_month_records": 0,
         "overall_valid_fraction": None,
         "minimum_cell_coverage_threshold": float(minimum_cell_coverage),
         "minimum_cell_valid_fraction": None,
@@ -138,11 +141,25 @@ def validate_regional_frame(
         report["first_valid_month"] = d.loc[d["value"].notna(), "date"].min().strftime("%Y-%m")
         report["last_valid_month"] = d.loc[d["value"].notna(), "date"].max().strftime("%Y-%m")
     report["valid_observations"] = int(d["value"].notna().sum())
-    report["missing_observations"] = int(d["value"].isna().sum())
+    report["explicit_missing_values"] = int(d["value"].isna().sum())
     total_expected = report["cells"] * report["expected_months_per_cell"]
+    report["recorded_cell_month_records"] = int(
+        d[["cell_id", "date"]].drop_duplicates().shape[0]
+    )
+    report["absent_cell_month_records"] = max(
+        0, total_expected - report["recorded_cell_month_records"]
+    )
+    report["missing_observations"] = max(
+        0, total_expected - report["valid_observations"]
+    )
     report["overall_valid_fraction"] = (
         report["valid_observations"] / total_expected if total_expected else None
     )
+    if report["missing_observations"]:
+        warnings.append(
+            f"{report['missing_observations']:,} of {total_expected:,} expected "
+            "cell-month observations are missing or absent from the archive."
+        )
 
     coverage = d.assign(valid=d["value"].notna()).groupby("cell_id")["valid"].sum()
     cell_fraction = coverage / report["expected_months_per_cell"]
