@@ -133,3 +133,58 @@ This product is an experimental retrospective indicator. It is not a
 heatwave definition, an impact model, a soil-moisture drought index, or an
 operational forecast. A later validation stage should compare precipitation
 behaviour against NASA GPM IMERG over their common period from 1998 onward.
+
+
+## First complete Ghana compound hot-dry run (14 November 2026)
+
+The first complete 1981–2025 regional execution is recorded in
+[GitHub Actions run 43607680465](https://github.com/Mikeswr/earthscope/actions/runs/43607680465).
+The associated research artifact is
+[earthscope-ghana-compound-hot-dry-1981-2025](https://github.com/Mikeswr/earthscope/actions/runs/43607680465/artifacts/14119156745).
+
+The two regional variables passed quality control. Each returned 91 grid
+cells and 49,140 monthly rows with 100% valid-month coverage. After selecting
+cell centres inside the geoBoundaries Ghana ADM0 geometry, 61 common cells
+were retained. Outputs include 32,940 monthly rows and 2,745 annual cell-year
+records.
+
+Of 32,818 classifiable cell-months, 2,099 (6.40%) met the compound hot-dry
+thresholds. The most spatially widespread years in this record were 1983
+(61/61 cells), 2001 (59/61), 2013 (58/61), 1987 (56/61), 1998 (54/61),
+2015 (54/61), and 2000 (52/61). 1998 had the largest total number of
+classified compound cell-months (283).
+
+No cell-level trend was significant after either Benjamini–Yekutieli or
+Benjamini–Hochberg correction. Two of 61 raw cell p-values were below 0.05,
+but neither survived correction. All 61 Sen slope estimates were zero because
+the annual cell-frequency series are heavily tied and zero-inflated: 68.1% of
+cell-years had no classified compound month.
+
+The exploratory unweighted mean annual frequency across the 61 cells had a
+Sen slope of +0.0408 percentage points per decade (95% interval -0.5855 to
++0.9320) and an AR(1)-adjusted Mann–Kendall p-value of 0.6854. It did not show
+a statistically significant monotonic trend. This mean is not an area-weighted
+national estimate.
+
+These results support the description of episodic compound hot-dry
+co-occurrence in this NASA POWER record. They do not support a claim of a
+persistent increasing trend across Ghana. They are not an operational warning
+or impact assessment.
+
+Limitations to retain in any presentation:
+- NASA POWER values are gridded estimates, not station observations.
+- The 61 retained points are returned grid-cell centres, not station sites or
+  official cell polygons. No spatial interpolation was used.
+- The geoBoundaries ADM0 geometry used by the first run represents 2007.
+- The regional API metadata captured units and coordinates but did not identify
+  the underlying source product for every month. NASA POWER meteorological
+  services use MERRA-2 and GEOS-IT source products; see the
+  [NASA POWER source documentation](https://power.larc.nasa.gov/docs/methodology/data/sources_meteorology/).
+- Independent precipitation cross-product evaluation against GPM IMERG Final
+  over the common 1998–2025 period remains pending. IMERG uses a finer
+  0.1-degree grid and a distinct retrieval chain, but its Final Run also uses
+  monthly gauge adjustment. This comparison must not be described as station
+  validation. See the [NASA GPM data directory](https://gpm.nasa.gov/data/directory).
+
+EarthScope is a NASA-data-based research prototype. It is not a NASA
+programme, partnership, endorsement, or operational warning service.
