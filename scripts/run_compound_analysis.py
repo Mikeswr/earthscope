@@ -15,6 +15,7 @@ import requests
 from earthscope import config
 from spatial.analysis import filter_cells_to_boundary
 from spatial.compound import compound_hot_dry_analysis
+from spatial.compound_summary import write_compound_summaries
 from spatial.validation import validate_regional_frame
 
 
@@ -129,6 +130,7 @@ def main(argv=None):
     monthly.to_csv(monthly_path, index=False)
     annual.to_csv(annual_path, index=False)
     trends.to_csv(trends_path, index=False)
+    summary_outputs = write_compound_summaries(annual, trends, output_dir)
 
     file_hashes = {}
     for variable in ("T2M", "PRECTOTCORR"):
@@ -147,6 +149,7 @@ def main(argv=None):
             "monthly": {"file": monthly_path.name, "rows": len(monthly)},
             "annual": {"file": annual_path.name, "rows": len(annual)},
             "cell_trends": {"file": trends_path.name, "rows": len(trends)},
+            **summary_outputs,
         },
         "software": {
             "python": __import__("platform").python_version(),
@@ -158,6 +161,8 @@ def main(argv=None):
     print(f"Monthly rows: {len(monthly):,}")
     print(f"Annual cell-years: {len(annual):,}")
     print(f"Ghana grid cells analysed: {len(trends):,}")
+    print(f"Cells with at least one compound event: "
+          f"{int((annual.groupby('cell_id')['n_hot_dry_months'].sum() > 0).sum()):,}")
     print(f"Run metadata: {metadata_path}")
     return 0
 
