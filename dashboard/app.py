@@ -544,6 +544,21 @@ def fetch_agromonitoring_history(lat, lon):
     return payload, parsed, start, end
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_agro_satellite_scenes(polygon_id, start_unix, end_unix):
+    return agro.search_satellite_images(polygon_id, int(start_unix), int(end_unix))
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_agro_satellite_image(scene, product):
+    return agro.fetch_satellite_image(scene, product)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_agro_satellite_stats(scene, product):
+    return agro.fetch_satellite_stats(scene, product)
+
+
 data=load_data()
 if data is None:
     st.markdown('<div class="hero"><div class="eyebrow">Ghana · Earth observation</div><h1>EarthScope</h1><p>Understand how environmental conditions change across time and place.</p></div>',unsafe_allow_html=True)
@@ -715,7 +730,7 @@ with overview_map:
         st.caption("Open the Ghana-wide map tab to retry the regional grid explorer.")
 
 
-sptab,ts,tr,fu,an,about,owtab,agtab=st.tabs(["Ghana-wide map","Explore time series","Compare trends","Future outlook","Unusual conditions","Data & methods","Weather now","Agromonitoring"])
+sptab,sattab,ts,tr,fu,an,about,owtab,agtab=st.tabs(["Ghana-wide map","Satellite imagery","Explore time series","Compare trends","Future outlook","Unusual conditions","Data & methods","Weather now","Agromonitoring"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -1008,6 +1023,129 @@ with agtab:
     with st.expander("How Agromonitoring data is used"):
         st.markdown("Agromonitoring weather is kept separate from NASA POWER and OpenWeather. It is not added to climate trend calculations. Temperature in the historical API is converted from Kelvin to Celsius by the ingestion parser.")
 
+
+with sattab:
+    st.markdown("### Satellite imagery and vegetation")
+    st.caption(
+        "Explore available Agromonitoring satellite scenes for the selected study location. "
+        "Imagery and vegetation indices are separate from NASA POWER trend calculations."
+    )
+    if not config.get_key(config.ENV_AGROMONITORING):
+        st.warning("Agromonitoring is not connected. Add AGROMONITORING_API_KEY to Streamlit Cloud Secrets.")
+    else:
+        sat_start_default = max(pd.Timestamp("2018-01-01").date(), (pd.Timestamp.now().date() - pd.Timedelta(days=365)).date())
+        sat_dates = st.date_input(
+            "Satellite acquisition search period",
+            value=(sat_start_default, pd.Timestamp.now().date()),
+            min_value=pd.Timestamp("2018-01-01").date(),
+            max_value=pd.Timestamp.now().date(),
+            key="agro_satellite_dates",
+        )
+        if isinstance(sat_dates, (tuple, list)) and len(sat_dates) == 2:
+            sat_start_date, sat_end_date = sat_dates
+        else:
+            sat_start_date = sat_end_date = sat_dates
+        sat_product = st.selectbox(
+            "Satellite product",
+            ["truecolor", "falsecolor", "ndvi", "evi", "evi2", "ndwi"],
+            format_func=lambda x: {
+                "truecolor":"True colour image", "falsecolor":"False colour image",
+                "ndvi":"NDVI vegetation index", "evi":"EVI vegetation index",
+                "evi2":"EVI2 vegetation index", "ndwi":"NDWI water index"
+            }[x],
+            key="agro_satellite_product",
+        )
+        st.caption(f"Study footprint: {loc} · centred on the configured EarthScope coordinate.")
+        create_sat_col, search_sat_col = st.columns(2)
+        with create_sat_col:
+            create_sat_polygon = st.button("Prepare study area", key="prepare_agro_satellite_area", use_container_width=True)
+        with search_sat_col:
+            search_sat_scenes = st.button("Search satellite scenes", type="primary", key="search_agro_satellite_scenes", use_container_width=True)
+
+        if create_sat_polygon:
+            try:
+                with st.spinner("Checking Agromonitoring study area..."):
+                    polygon = agro.find_or_create_study_polygon(loc, row["latitude"], row["longitude"])
+                st.session_state["agro_sat_polygon_id"] = polygon["id"]
+                st.session_state["agro_sat_polygon_location"] = loc
+                st.success(f"Study area is ready for {loc}.")
+            except api_http.ApiError as exc:
+                st.error(f"Agromonitoring could not prepare this study area: {exc}")
+            except (KeyError, TypeError, ValueError, RuntimeError) as exc:
+                st.error(f"Study area setup failed: {exc}")
+
+        polygon_id = st.session_state.get("agro_sat_polygon_id")
+        polygon_location = st.session_state.get("agro_sat_polygon_location")
+        if polygon_id and polygon_location != loc:
+            st.info("The prepared study area belongs to another location. Select Prepare study area for the current location.")
+            polygon_id = None
+
+        if search_sat_scenes:
+            if not polygon_id:
+                st.warning("Prepare the study area for the selected location first.")
+            elif sat_end_date < sat_start_date:
+                st.warning("The end date must be on or after the start date.")
+            else:
+                try:
+                    start_unix = int(pd.Timestamp(sat_start_date, tz="UTC").timestamp())
+                    end_unix = int((pd.Timestamp(sat_end_date, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)).timestamp())
+                    with st.spinner("Searching Agromonitoring for available satellite acquisitions..."):
+                        scenes = fetch_agro_satellite_scenes(polygon_id, start_unix, end_unix)
+                    st.session_state["agro_satellite_scenes"] = scenes
+                    st.session_state["agro_satellite_scene_location"] = loc
+                    st.session_state["agro_satellite_search_period"] = (str(sat_start_date), str(sat_end_date))
+                    if scenes:
+                        st.success(f"Found {len(scenes)} available satellite scene(s).")
+                    else:
+                        st.info("No satellite scenes were returned for this footprint and period. Try a wider date range or another study location.")
+                except api_http.ApiError as exc:
+                    st.error(f"Agromonitoring satellite search failed: {exc}")
+                except (KeyError, TypeError, ValueError, RuntimeError) as exc:
+                    st.error(f"Satellite search response could not be processed: {exc}")
+
+        scenes = st.session_state.get("agro_satellite_scenes", [])
+        if scenes and st.session_state.get("agro_satellite_scene_location") == loc:
+            scene_labels = []
+            for index, scene in enumerate(scenes):
+                acquired = pd.to_datetime(scene.get("dt"), unit="s", utc=True).strftime("%Y-%m-%d") if scene.get("dt") else "Date unavailable"
+                satellite = scene.get("type", scene.get("source", "Satellite"))
+                cloud = scene.get("cl")
+                cloud_label = f"{float(cloud):.1f}% clouds" if cloud is not None else "Cloud cover unavailable"
+                coverage = scene.get("dc")
+                coverage_label = f"{float(coverage):.1f}% valid coverage" if coverage is not None else "Coverage unavailable"
+                scene_labels.append(f"{acquired} · {satellite} · {cloud_label} · {coverage_label}")
+            selected_scene_index = st.selectbox(
+                "Available acquisition",
+                range(len(scenes)),
+                format_func=lambda i: scene_labels[i],
+                key="agro_satellite_scene_index",
+            )
+            selected_scene = scenes[selected_scene_index]
+            try:
+                with st.spinner("Retrieving satellite product..."):
+                    image_bytes = fetch_agro_satellite_image(selected_scene, sat_product)
+                st.image(image_bytes, caption=f"{loc} · {sat_product.upper()} · {scene_labels[selected_scene_index]}", use_container_width=True)
+                st.caption("Image supplied by Agromonitoring from its supported Landsat 8 and Sentinel-2 archive. Availability, cloud cover and valid-data coverage vary by acquisition.")
+                if sat_product in {"ndvi", "evi", "evi2", "ndwi"}:
+                    try:
+                        stats = fetch_agro_satellite_stats(selected_scene, sat_product)
+                        if stats:
+                            with st.expander(f"{sat_product.upper()} polygon statistics"):
+                                st.json(stats)
+                    except (api_http.ApiError, KeyError, TypeError, ValueError, RuntimeError) as stats_error:
+                        st.caption(f"Index statistics are unavailable for this scene: {stats_error}")
+            except (api_http.ApiError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+                st.error(f"The selected satellite product could not be displayed: {exc}")
+
+        with st.expander("Study area and data limitations"):
+            st.markdown(
+                "EarthScope creates or reuses a 25 km² square polygon centred on the configured study coordinate. "
+                "This is an analytical footprint, not an official city or district boundary. Agromonitoring returns "
+                "only acquisitions available for that polygon and account. Cloud cover and valid-data coverage should "
+                "be checked before interpretation. Satellite-derived indices are not merged into NASA POWER climate "
+                "trend calculations and do not independently validate those trends."
+            )
+            st.caption("Agromonitoring imagery products include true colour, false colour, NDVI, EVI, EVI2 and other indices where available.")
 
 with sptab:
     st.markdown("### Ghana-wide environmental map")
