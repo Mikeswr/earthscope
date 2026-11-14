@@ -31,6 +31,9 @@ def test_summaries_preserve_cells_and_count_annual_events():
     assert len(geojson["features"]) == 2
     assert meta["n_grid_cells"] == 2
     assert "not an area-weighted national estimate" in meta["spatial_inference"]
+    assert meta["domain_aggregate_trend"]["n_valid_years"] == 2
+    assert meta["domain_aggregate_trend"]["mann_kendall_p"] is not None
+    assert meta["domain_aggregate_trend"]["autocorrelation_method"].startswith("AR(1)")
 
 
 def test_summaries_join_cell_trend_results():
