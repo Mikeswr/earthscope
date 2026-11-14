@@ -114,11 +114,11 @@ def validate_regional_frame(
     if (coord_counts > 1).any(axis=None):
         errors.append("At least one cell_id maps to more than one coordinate pair.")
 
-    expected_ids = (
-        d["latitude"].round(4).astype("string") + "_" +
-        d["longitude"].round(4).astype("string")
+    expected_ids = d.apply(
+        lambda row: f"{row['latitude']:.4f}_{row['longitude']:.4f}",
+        axis=1,
     )
-    if not d["cell_id"].astype("string").equals(expected_ids):
+    if not d["cell_id"].astype(str).eq(expected_ids.astype(str)).all():
         warnings.append("Some cell_id values do not match the parser's rounded coordinate convention.")
 
     report["cells"] = int(d["cell_id"].nunique(dropna=True))
@@ -146,14 +146,17 @@ def validate_regional_frame(
 
     coverage = d.assign(valid=d["value"].notna()).groupby("cell_id")["valid"].sum()
     cell_fraction = coverage / report["expected_months_per_cell"]
+    coverage_threshold_failed = False
     if len(cell_fraction):
         report["minimum_cell_valid_fraction"] = float(cell_fraction.min())
         report["median_cell_valid_fraction"] = float(cell_fraction.median())
         below = int((cell_fraction < minimum_cell_coverage).sum())
         if below:
+            coverage_threshold_failed = True
             warnings.append(
                 f"{below} of {len(cell_fraction)} cells fall below "
-                f"{minimum_cell_coverage:.0%} valid-month coverage."
+                f"{minimum_cell_coverage:.0%} valid-month coverage; these cells require review "
+                "and must not be included in the primary grid analysis."
             )
 
     bounds = PHYSICAL_BOUNDS.get(variable)
@@ -170,5 +173,5 @@ def validate_regional_frame(
         errors.append("No valid numeric observations were found.")
 
     report["status"] = "fail" if errors else ("warn" if warnings else "pass")
-    report["analysis_eligible"] = not errors
+    report["analysis_eligible"] = not errors and not coverage_threshold_failed
     return report
