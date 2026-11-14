@@ -59,7 +59,7 @@ def summarise_compound_outputs(annual: pd.DataFrame, trends: pd.DataFrame):
         & (a["n_hot_dry_months"] > a["n_months_assessed"])
     ).any():
         raise ValueError("Compound event counts cannot exceed assessed months.")
-    if a["hot_dry_frequency_pct"].dropna().between(0, 100).all() is False:
+    if not a["hot_dry_frequency_pct"].dropna().between(0, 100).all():
         raise ValueError("Annual compound frequencies must be within 0 to 100 percent.")
     coordinate_counts = a.groupby("cell_id")[["latitude", "longitude"]].nunique()
     if (coordinate_counts > 1).any(axis=None):
