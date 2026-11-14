@@ -1033,7 +1033,7 @@ with sattab:
     if not config.get_key(config.ENV_AGROMONITORING):
         st.warning("Agromonitoring is not connected. Add AGROMONITORING_API_KEY to Streamlit Cloud Secrets.")
     else:
-        sat_start_default = max(pd.Timestamp("2018-01-01").date(), (pd.Timestamp.now().date() - pd.Timedelta(days=365)).date())
+        sat_start_default = max(pd.Timestamp("2018-01-01").date(), pd.Timestamp.now().date() - pd.Timedelta(days=365))
         sat_dates = st.date_input(
             "Satellite acquisition search period",
             value=(sat_start_default, pd.Timestamp.now().date()),
