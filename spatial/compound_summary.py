@@ -53,16 +53,34 @@ def summarise_compound_outputs(annual: pd.DataFrame, trends: pd.DataFrame):
         raise ValueError("Annual compound table contains missing cell IDs.")
     if (a["n_hot_dry_months"].dropna() < 0).any():
         raise ValueError("Annual compound table contains negative event counts.")
+    if (
+        a["n_months_assessed"].notna()
+        & a["n_hot_dry_months"].notna()
+        & (a["n_hot_dry_months"] > a["n_months_assessed"])
+    ).any():
+        raise ValueError("Compound event counts cannot exceed assessed months.")
+    if a["hot_dry_frequency_pct"].dropna().between(0, 100).all() is False:
+        raise ValueError("Annual compound frequencies must be within 0 to 100 percent.")
+    coordinate_counts = a.groupby("cell_id")[["latitude", "longitude"]].nunique()
+    if (coordinate_counts > 1).any(axis=None):
+        raise ValueError("Cell IDs must map to stable coordinates across years.")
+
+    a["_assessed_event_months"] = a["n_hot_dry_months"].where(
+        a["hot_dry_frequency_pct"].notna()
+    )
+    a["_has_event_when_assessed"] = (
+        a["n_hot_dry_months"].gt(0) & a["hot_dry_frequency_pct"].notna()
+    )
 
     annual_summary = (
         a.groupby("year", as_index=False)
         .agg(
-            n_grid_cells_assessed=("cell_id", "nunique"),
-            total_compound_hot_dry_cell_months=("n_hot_dry_months", "sum"),
+            n_grid_cells_assessed=("hot_dry_frequency_pct", "count"),
+            total_compound_hot_dry_cell_months=("_assessed_event_months", "sum"),
             mean_cell_annual_frequency_pct=("hot_dry_frequency_pct", "mean"),
             median_cell_annual_frequency_pct=("hot_dry_frequency_pct", "median"),
             n_cells_with_at_least_one_event=(
-                "n_hot_dry_months", lambda x: int((x > 0).sum())
+                "_has_event_when_assessed", "sum"
             ),
             n_cell_years_assessed=("hot_dry_frequency_pct", "count"),
         )
@@ -76,9 +94,9 @@ def summarise_compound_outputs(annual: pd.DataFrame, trends: pd.DataFrame):
         a.groupby(["cell_id", "latitude", "longitude"], as_index=False)
         .agg(
             n_years_assessed=("hot_dry_frequency_pct", "count"),
-            total_compound_hot_dry_months=("n_hot_dry_months", "sum"),
+            total_compound_hot_dry_months=("_assessed_event_months", "sum"),
             n_years_with_at_least_one_event=(
-                "n_hot_dry_months", lambda x: int((x > 0).sum())
+                "_has_event_when_assessed", "sum"
             ),
             mean_annual_frequency_pct=("hot_dry_frequency_pct", "mean"),
             median_annual_frequency_pct=("hot_dry_frequency_pct", "median"),
@@ -130,7 +148,6 @@ def summarise_compound_outputs(annual: pd.DataFrame, trends: pd.DataFrame):
     geojson = {
         "type": "FeatureCollection",
         "name": "earthscope_compound_hot_dry_grid_cell_centres",
-        "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
         "metadata": {
             "geometry_semantics": "Returned NASA POWER grid-cell centroids; not station locations or cell polygons.",
             "spatial_interpolation": False,
