@@ -12,6 +12,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from earthscope.trends import engine
+
 
 ANNUAL_REQUIRED = {
     "year", "cell_id", "latitude", "longitude",
@@ -155,6 +157,40 @@ def summarise_compound_outputs(annual: pd.DataFrame, trends: pd.DataFrame):
         },
         "features": features,
     }
+    domain_series = annual_summary.set_index("year")["mean_cell_annual_frequency_pct"]
+    domain_mk = engine.mann_kendall(
+        domain_series, alpha=0.05, autocorrelation="ar1_neff"
+    )
+    domain_trend = {
+        "series": "Unweighted mean annual compound hot-dry frequency across retained grid-cell centres",
+        "n_valid_years": int(domain_mk["n"]),
+        "year_span": int(domain_mk["n_span"]),
+        "trend_direction": domain_mk["trend"],
+        "sen_slope_percentage_points_per_decade": engine.sens_slope_per_decade(domain_series),
+        "sen_ci_low_percentage_points_per_decade": (
+            float(domain_mk["slope_ci_low"] * 10)
+            if np.isfinite(domain_mk["slope_ci_low"]) else None
+        ),
+        "sen_ci_high_percentage_points_per_decade": (
+            float(domain_mk["slope_ci_high"] * 10)
+            if np.isfinite(domain_mk["slope_ci_high"]) else None
+        ),
+        "mann_kendall_p": (
+            float(domain_mk["p"]) if np.isfinite(domain_mk["p"]) else None
+        ),
+        "kendall_tau": (
+            float(domain_mk["tau"]) if np.isfinite(domain_mk["tau"]) else None
+        ),
+        "lag1_autocorrelation": (
+            float(domain_mk["rho1"]) if np.isfinite(domain_mk["rho1"]) else None
+        ),
+        "variance_factor": (
+            float(domain_mk["variance_factor"])
+            if np.isfinite(domain_mk["variance_factor"]) else None
+        ),
+        "autocorrelation_method": "AR(1) effective-sample-size variance adjustment",
+        "status": "exploratory aggregate time-series test; not a spatially area-weighted national estimate",
+    }
     summary_metadata = {
         "n_grid_cells": int(cell_summary["cell_id"].nunique()),
         "n_annual_grid_summaries": int(len(annual_summary)),
@@ -162,6 +198,7 @@ def summarise_compound_outputs(annual: pd.DataFrame, trends: pd.DataFrame):
         "total_classified_compound_hot_dry_cell_months": int(
             annual_summary["total_compound_hot_dry_cell_months"].sum()
         ),
+        "domain_aggregate_trend": domain_trend,
         "spatial_inference": (
             "Summaries describe retained NASA POWER grid-cell centres inside the supplied "
             "Ghana boundary. Annual cell summaries are unweighted and are not an area-weighted "
