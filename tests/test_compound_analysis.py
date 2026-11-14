@@ -92,3 +92,12 @@ def test_compound_analysis_requires_baseline_inside_period():
     temp, rain = sample_climate_frames(start_year=2000, end_year=2025)
     with pytest.raises(ValueError, match="baseline period"):
         compound_hot_dry_analysis(temp, rain, 2000, 2025)
+
+
+def test_compound_runner_cli_imports_and_exposes_help(capsys):
+    from scripts.run_compound_analysis import main
+
+    with pytest.raises(SystemExit) as exc:
+        main(["--help"])
+    assert exc.value.code == 0
+    assert "compound hot-dry analysis" in capsys.readouterr().out.lower()
