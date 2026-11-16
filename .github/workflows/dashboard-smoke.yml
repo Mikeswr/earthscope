@@ -32,8 +32,11 @@ jobs:
               raise SystemExit(f"Missing deployed dashboard dataset: {path}")
           with path.open(newline="", encoding="utf-8") as handle:
               reader = csv.DictReader(handle)
-              fields = reader.fieldnames or []
-              print(f"Dataset columns: {fields}")
+              fields = set(reader.fieldnames or [])
+              required = {"date", "cell_id", "latitude", "longitude", "precipitation_mean", "precipitation_count"}
+              missing = required.difference(fields)
+              if missing:
+                  raise SystemExit(f"Missing required IMERG columns: {sorted(missing)}")
               rows = sum(1 for _ in reader)
           if rows != 20313:
               raise SystemExit(f"Expected 20,313 paired cell-months, found {rows}")
