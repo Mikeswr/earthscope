@@ -21,6 +21,10 @@ jobs:
           python-version: "3.11"
       - name: Compile dashboard
         run: python -m py_compile dashboard/app.py
+      - name: Verify dashboard package imports
+        run: |
+          python -m pip install numpy pandas scipy
+          PYTHONPATH="$(dirname "$GITHUB_WORKSPACE")" python -c "from earthscope.spatial.imerg_validation import compare_power_imerg; print('IMERG comparison module import successful')"
       - name: Verify paired rainfall dataset
         run: |
           python - <<'PY'
