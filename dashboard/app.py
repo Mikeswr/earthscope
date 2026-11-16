@@ -1321,7 +1321,13 @@ with imergtab:
             end="2025-09-01",
             minimum_cell_coverage=0.80,
         )
-        return comparison["paired_monthly"], comparison["cell_metrics"]
+        paired = comparison["paired_monthly"].copy()
+        # The comparison engine returns the two monthly totals separately.
+        # Derive the signed difference here for dashboard summaries and plots.
+        paired["bias_mm"] = (
+            paired["imerg_month_total_mm"] - paired["power_month_total_mm"]
+        )
+        return paired, comparison["cell_metrics"]
 
     if st.button("Load rainfall comparison", type="primary", key="load_imerg_power_comparison"):
         try:
