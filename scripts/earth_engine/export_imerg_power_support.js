@@ -135,7 +135,8 @@ var rows = ee.FeatureCollection(MONTHLY.iterate(function(image, accumulator) {
 
   sampled = sampled.map(function(feature) {
     var rate = feature.get('precipitation_mean');
-    var hasRate = ee.Algorithms.IsEqual(rate, null).not();
+    var isNullRate = ee.Number(ee.Algorithms.If(ee.Algorithms.IsEqual(rate, null), 1, 0));
+    var hasRate = isNullRate.eq(0);
     var rateNumber = ee.Number(ee.Algorithms.If(hasRate, rate, 0));
     var monthTotal = ee.Algorithms.If(
       hasRate,
