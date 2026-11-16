@@ -21,7 +21,7 @@ from earthscope.ingest import http as api_http
 from earthscope.forecasting.engine import ForecastError, forecast_monthly
 from earthscope.spatial.power_regional import fetch_parameter
 from earthscope.spatial.map import build_regional_grid_map
-from spatial.imerg_validation import compare_power_imerg
+from earthscope.spatial.imerg_validation import compare_power_imerg
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
