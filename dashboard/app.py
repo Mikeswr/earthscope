@@ -731,8 +731,29 @@ with overview_map:
         st.caption("Open the Ghana-wide map tab to retry the regional grid explorer.")
 
 
-sptab,sattab,ts,tr,fu,an,about,owtab,agtab,imergtab=st.tabs(["Ghana-wide map","Satellite imagery","Explore time series","Compare trends","Future outlook","Unusual conditions","Data & methods","Weather now","Agromonitoring","Rainfall product comparison"])
-with ts:
+st.markdown("### Workspace")
+st.caption("Choose a focused view. Your location and variable selections remain in effect across views.")
+page_options = [
+    "Explore · Ghana-wide map",
+    "Observe · Satellite imagery",
+    "Analyse · Explore time series",
+    "Analyse · Compare trends",
+    "Predict · Future outlook",
+    "Monitor · Unusual conditions",
+    "Monitor · Weather now",
+    "Monitor · Agromonitoring",
+    "Compare · Rainfall products",
+    "Reference · Data & methods",
+]
+active_page = st.selectbox(
+    "Open a workspace",
+    page_options,
+    index=0,
+    key="earthscope_workspace_navigation",
+    label_visibility="collapsed",
+)
+
+if active_page == "Analyse · Explore time series":
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
     fig=go.Figure()
@@ -764,7 +785,7 @@ with ts:
     with st.expander("What do the statistics mean?"):
         st.markdown("- **Sen's slope:** estimated rate of change per decade.\n- **Mann-Kendall:** tests evidence of a monotonic upward or downward trend.\n- **FDR-adjusted p-value:** accounts for testing several location-variable combinations.\n- Statistical significance does not identify the physical cause of a change.")
 
-with tr:
+if active_page == "Analyse · Compare trends":
     st.markdown("### How do locations compare?")
     st.write(f"Trend estimates for {name(var)} across the study locations.")
     cols=["location","n_years","sen_per_decade","sen_ci_low_per_decade","sen_ci_high_per_decade","mk_trend","mk_p","mk_p_fdr","evidence_class"]
@@ -778,7 +799,7 @@ with tr:
         st.markdown("- **Significant after FDR:** adjusted p-value below 0.05.\n- **Significant before FDR only:** raw p-value below 0.05, but adjusted result is not.\n- **Not significant:** insufficient statistical evidence of a monotonic trend.\n- **Insufficient data:** minimum data requirements were not met.")
 
 
-with fu:
+if active_page == "Predict · Future outlook":
     st.markdown("### What might happen next?")
     st.write("EarthScope compares forecasting methods against withheld historical observations, then uses the best-performing method for a statistical outlook.")
     st.warning("These are statistical extrapolations from NASA POWER grid-cell data, not climate-model projections or guaranteed future conditions. They do not account for future emissions, policy, land-use change or climate scenarios.")
@@ -852,7 +873,7 @@ with fu:
     except Exception as exc:
         st.error(f"The forecasting run could not be completed safely: {exc}")
 
-with an:
+if active_page == "Monitor · Unusual conditions":
     st.markdown("### When did unusual conditions occur?")
     st.write("An anomaly differs from the typical value for that calendar month in the 1991–2020 reference period.")
     z=anoms[(anoms.location==loc)&(anoms.variable==var)]
@@ -867,13 +888,13 @@ with an:
     st.metric("Flagged observations",f"{len(flagged):,}")
     st.dataframe(flagged[["date","value","anomaly","z"]].round({"value":3,"anomaly":3,"z":3}),hide_index=True,width="stretch")
 
-with sptab:
+if active_page == "Explore · Ghana-wide map":
     st.markdown("### Where do the location results differ?")
     st.write("Each marker represents one configured NASA POWER grid-cell location.")
     st.plotly_chart(point_trend_map(trends,var),width="stretch")
     st.warning("This is a map of five point results, not an interpolated continuous spatial trend field.")
 
-with about:
+if active_page == "Reference · Data & methods":
     st.markdown("### How complete and reliable is the dataset?")
     st.dataframe(checks.completeness(df).round({"pct_valid":1}),hide_index=True,width="stretch")
     st.dataframe(df.qc_flag.value_counts().rename_axis("Flag").reset_index(name="Records"),hide_index=True,width="stretch")
@@ -890,7 +911,7 @@ with about:
 
 
 
-with owtab:
+if active_page == "Monitor · Weather now":
     st.markdown("### OpenWeather nowcast")
     st.write("Live conditions plus an interactive view of the latest four hourly observations. The four-hour series is recent weather history, not a forecast.")
     if not config.get_key(config.ENV_OPENWEATHER):
@@ -964,7 +985,7 @@ with owtab:
     with st.expander("Source and interpretation"):
         st.markdown("OpenWeather current conditions and recent hourly history are displayed separately from NASA POWER. They are not merged into the long-term trend calculations.")
         
-with agtab:
+if active_page == "Monitor · Agromonitoring":
     st.markdown("### Agromonitoring weather")
     st.write("A second weather source for current conditions and historical hourly data. Historical archive depth depends on the API subscription.")
     if not config.get_key(config.ENV_AGROMONITORING):
@@ -1025,7 +1046,7 @@ with agtab:
         st.markdown("Agromonitoring weather is kept separate from NASA POWER and OpenWeather. It is not added to climate trend calculations. Temperature in the historical API is converted from Kelvin to Celsius by the ingestion parser.")
 
 
-with sattab:
+if active_page == "Observe · Satellite imagery":
     st.markdown("### Satellite imagery and vegetation")
     st.caption(
         "Explore available Agromonitoring satellite scenes for the selected study location. "
@@ -1148,7 +1169,7 @@ with sattab:
             )
             st.caption("Agromonitoring imagery products include true colour, false colour, NDVI, EVI, EVI2 and other indices where available.")
 
-with sptab:
+if active_page == "Explore · Ghana-wide map":
     st.markdown("### Ghana-wide environmental map")
     st.caption(
         "Explore NASA POWER regional grid cells across Ghana. Choose what the map displays, "
@@ -1296,7 +1317,7 @@ with sptab:
         )
 
 
-with imergtab:
+if active_page == "Compare · Rainfall products":
     st.markdown("### Ghana rainfall product comparison")
     st.caption(
         "A cell-by-cell comparison of monthly GPM IMERG Final precipitation and NASA POWER "
