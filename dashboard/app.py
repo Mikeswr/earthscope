@@ -21,6 +21,7 @@ from earthscope.ingest import http as api_http
 from earthscope.forecasting.engine import ForecastError, forecast_monthly
 from earthscope.spatial.power_regional import fetch_parameter
 from earthscope.spatial.map import build_regional_grid_map
+from spatial.imerg_validation import compare_power_imerg
 
 st.set_page_config(page_title="EarthScope | Environmental intelligence", page_icon="🌍", layout="wide")
 
@@ -1302,35 +1303,47 @@ with imergtab:
         "corrected precipitation estimates, using the common period January 1998 to September 2025."
     )
 
-    @st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
+    @st.cache_data(ttl=7 * 24 * 60 * 60, show_spinner=False)
     def load_imerg_power_pairs():
-        data_path = Path(__file__).resolve().parents[1] / "data" / "spatial" / "imerg" / "earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv"
-        if not data_path.exists():
-            raise FileNotFoundError("The verified IMERG and NASA POWER paired dataset is not present in this deployment.")
-        frame = pd.read_csv(data_path, parse_dates=["date"])
-        required = {
-            "date", "cell_id", "latitude_power", "longitude_power",
-            "power_month_total_mm", "imerg_month_total_mm", "season", "year",
-        }
-        missing = required.difference(frame.columns)
-        if missing:
-            raise ValueError(f"The paired dataset is missing required columns: {', '.join(sorted(missing))}")
-        if frame.duplicated(["cell_id", "date"]).any():
-            raise ValueError("Duplicate cell-month records were found. The comparison is withheld.")
-        frame = frame.dropna(subset=["power_month_total_mm", "imerg_month_total_mm"]).copy()
-        if (frame[["power_month_total_mm", "imerg_month_total_mm"]] < 0).any().any():
-            raise ValueError("Negative monthly precipitation totals were found. The comparison is withheld.")
-        frame["bias_mm"] = frame["imerg_month_total_mm"] - frame["power_month_total_mm"]
-        return frame
+        root = Path(__file__).resolve().parents[1]
+        imerg_path = root / "data" / "spatial" / "imerg" / "earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv"
+        grid_path = root / "data" / "reference" / "ghana_power_grid_cells_2007_adm0.csv"
+        if not imerg_path.exists() or not grid_path.exists():
+            raise FileNotFoundError("The verified IMERG export or Ghana POWER grid reference is missing.")
+        imerg_frame = pd.read_csv(imerg_path)
+        grid_frame = pd.read_csv(grid_path)
+        power_frame = fetch_parameter("PRECTOTCORR", 1998, 2025)
+        comparison = compare_power_imerg(
+            power_frame,
+            imerg_frame,
+            grid_frame,
+            start="1998-01-01",
+            end="2025-09-01",
+            minimum_cell_coverage=0.80,
+        )
+        return comparison["paired_monthly"], comparison["cell_metrics"]
 
-    try:
-        with st.spinner("Loading the verified 1998–2025 paired rainfall dataset..."):
-            imerg_pairs = load_imerg_power_pairs()
-    except Exception as exc:
-        imerg_pairs = None
-        st.error(f"The rainfall comparison is currently unavailable: {exc}")
+    if st.button("Load rainfall comparison", type="primary", key="load_imerg_power_comparison"):
+        try:
+            with st.spinner("Retrieving NASA POWER precipitation and preparing the 1998–2025 comparison..."):
+                paired_frame, cell_frame = load_imerg_power_pairs()
+            st.session_state["imerg_power_pairs"] = paired_frame
+            st.session_state["imerg_power_cell_metrics"] = cell_frame
+            st.session_state["imerg_power_load_error"] = None
+        except Exception as exc:
+            st.session_state["imerg_power_load_error"] = str(exc)
 
-    if imerg_pairs is not None and not imerg_pairs.empty:
+    if st.session_state.get("imerg_power_load_error"):
+        st.error(f"The rainfall comparison is currently unavailable: {st.session_state['imerg_power_load_error']}")
+
+    imerg_pairs = st.session_state.get("imerg_power_pairs")
+    verified_cell_stats = st.session_state.get("imerg_power_cell_metrics")
+    if imerg_pairs is None or verified_cell_stats is None:
+        st.info(
+            "Select **Load rainfall comparison** to retrieve the matching NASA POWER record "
+            "and build the verified comparison. Results are cached for seven days."
+        )
+    elif not imerg_pairs.empty:
         n_pairs = len(imerg_pairs)
         n_cells = int(imerg_pairs["cell_id"].nunique())
         overall_bias = float(imerg_pairs["bias_mm"].mean())
@@ -1365,14 +1378,9 @@ with imergtab:
             ["Mean bias (IMERG − POWER)", "Mean absolute error", "Pearson correlation"],
             key="imerg_map_metric",
         )
-        cell_stats = imerg_pairs.groupby("cell_id", as_index=False).agg(
-            latitude=("latitude_power", "first"),
-            longitude=("longitude_power", "first"),
-            bias_mm=("bias_mm", "mean"),
-            mae_mm=("bias_mm", lambda x: x.abs().mean()),
-            pearson_r=("imerg_month_total_mm", lambda x: x.corr(imerg_pairs.loc[x.index, "power_month_total_mm"])),
-            n_pairs=("date", "count"),
-        )
+        cell_stats = verified_cell_stats.rename(columns={
+            "bias_imerg_minus_power_mm": "bias_mm",
+        })[["cell_id", "latitude", "longitude", "bias_mm", "mae_mm", "pearson_r", "n_pairs"]].copy()
         metric_columns = {
             "Mean bias (IMERG − POWER)": ("bias_mm", "Mean bias (mm/month)"),
             "Mean absolute error": ("mae_mm", "Mean absolute error (mm/month)"),
