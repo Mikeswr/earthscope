@@ -730,7 +730,7 @@ with overview_map:
         st.caption("Open the Ghana-wide map tab to retry the regional grid explorer.")
 
 
-sptab,sattab,ts,tr,fu,an,about,owtab,agtab=st.tabs(["Ghana-wide map","Satellite imagery","Explore time series","Compare trends","Future outlook","Unusual conditions","Data & methods","Weather now","Agromonitoring"])
+sptab,sattab,ts,tr,fu,an,about,owtab,agtab,imergtab=st.tabs(["Ghana-wide map","Satellite imagery","Explore time series","Compare trends","Future outlook","Unusual conditions","Data & methods","Weather now","Agromonitoring","Rainfall product comparison"])
 with ts:
     st.markdown("### How has this variable changed?")
     st.write("The line shows monthly values. Dots show annual summaries. The dashed line shows the estimated long-term Sen's slope.")
@@ -1293,6 +1293,265 @@ with sptab:
             "Choose a variable, period and map display above, then select **Load / update map**. "
             "The first request may take a little time. Results are cached for seven days."
         )
+
+
+with imergtab:
+    st.markdown("### Ghana rainfall product comparison")
+    st.caption(
+        "A cell-by-cell comparison of monthly GPM IMERG Final precipitation and NASA POWER "
+        "corrected precipitation estimates, using the common period January 1998 to September 2025."
+    )
+
+    @st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
+    def load_imerg_power_pairs():
+        data_path = Path(__file__).resolve().parents[1] / "data" / "spatial" / "imerg" / "earthscope_ghana_imerg_monthly_power_support_1998_2025_09.csv"
+        if not data_path.exists():
+            raise FileNotFoundError("The verified IMERG and NASA POWER paired dataset is not present in this deployment.")
+        frame = pd.read_csv(data_path, parse_dates=["date"])
+        required = {
+            "date", "cell_id", "latitude_power", "longitude_power",
+            "power_month_total_mm", "imerg_month_total_mm", "season", "year",
+        }
+        missing = required.difference(frame.columns)
+        if missing:
+            raise ValueError(f"The paired dataset is missing required columns: {', '.join(sorted(missing))}")
+        if frame.duplicated(["cell_id", "date"]).any():
+            raise ValueError("Duplicate cell-month records were found. The comparison is withheld.")
+        frame = frame.dropna(subset=["power_month_total_mm", "imerg_month_total_mm"]).copy()
+        if (frame[["power_month_total_mm", "imerg_month_total_mm"]] < 0).any().any():
+            raise ValueError("Negative monthly precipitation totals were found. The comparison is withheld.")
+        frame["bias_mm"] = frame["imerg_month_total_mm"] - frame["power_month_total_mm"]
+        return frame
+
+    try:
+        with st.spinner("Loading the verified 1998–2025 paired rainfall dataset..."):
+            imerg_pairs = load_imerg_power_pairs()
+    except Exception as exc:
+        imerg_pairs = None
+        st.error(f"The rainfall comparison is currently unavailable: {exc}")
+
+    if imerg_pairs is not None and not imerg_pairs.empty:
+        n_pairs = len(imerg_pairs)
+        n_cells = int(imerg_pairs["cell_id"].nunique())
+        overall_bias = float(imerg_pairs["bias_mm"].mean())
+        overall_mae = float(imerg_pairs["bias_mm"].abs().mean())
+        overall_rmse = float(np.sqrt(np.mean(imerg_pairs["bias_mm"] ** 2)))
+        overall_r = float(imerg_pairs["imerg_month_total_mm"].corr(imerg_pairs["power_month_total_mm"]))
+        overall_spearman = float(imerg_pairs["imerg_month_total_mm"].corr(imerg_pairs["power_month_total_mm"], method="spearman"))
+        overall_pbias = float(100 * imerg_pairs["bias_mm"].sum() / imerg_pairs["power_month_total_mm"].sum())
+        overall_nse = float(1 - (imerg_pairs["bias_mm"] ** 2).sum() / ((imerg_pairs["power_month_total_mm"] - imerg_pairs["power_month_total_mm"].mean()) ** 2).sum())
+
+        st.markdown(
+            '<div class="note"><b>How to read this:</b> bias is IMERG minus POWER. '
+            'Negative values mean IMERG reports a lower monthly rainfall total than POWER. '
+            'Positive values mean IMERG reports a higher total.</div>',
+            unsafe_allow_html=True,
+        )
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Paired cell-months", f"{n_pairs:,}")
+        k2.metric("Grid cells", f"{n_cells}")
+        k3.metric("Mean bias", f"{overall_bias:+.2f} mm/month")
+        k4.metric("Pearson correlation", f"{overall_r:.3f}")
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Mean absolute error", f"{overall_mae:.2f} mm")
+        m2.metric("Root mean square error", f"{overall_rmse:.2f} mm")
+        m3.metric("Relative bias", f"{overall_pbias:+.2f}%")
+        m4.metric("Nash–Sutcliffe efficiency", f"{overall_nse:.3f}")
+
+        st.markdown("#### Spatial pattern across Ghana")
+        metric_choice = st.selectbox(
+            "Map metric",
+            ["Mean bias (IMERG − POWER)", "Mean absolute error", "Pearson correlation"],
+            key="imerg_map_metric",
+        )
+        cell_stats = imerg_pairs.groupby("cell_id", as_index=False).agg(
+            latitude=("latitude_power", "first"),
+            longitude=("longitude_power", "first"),
+            bias_mm=("bias_mm", "mean"),
+            mae_mm=("bias_mm", lambda x: x.abs().mean()),
+            pearson_r=("imerg_month_total_mm", lambda x: x.corr(imerg_pairs.loc[x.index, "power_month_total_mm"])),
+            n_pairs=("date", "count"),
+        )
+        metric_columns = {
+            "Mean bias (IMERG − POWER)": ("bias_mm", "Mean bias (mm/month)"),
+            "Mean absolute error": ("mae_mm", "Mean absolute error (mm/month)"),
+            "Pearson correlation": ("pearson_r", "Pearson correlation"),
+        }
+        metric_col, colorbar_title = metric_columns[metric_choice]
+        colour_midpoint = 0 if metric_col == "bias_mm" else None
+        map_fig = go.Figure(go.Scattergeo(
+            lon=cell_stats["longitude"],
+            lat=cell_stats["latitude"],
+            text=cell_stats["cell_id"],
+            customdata=np.column_stack([
+                cell_stats["n_pairs"], cell_stats["bias_mm"],
+                cell_stats["mae_mm"], cell_stats["pearson_r"],
+            ]),
+            mode="markers",
+            marker=dict(
+                size=12,
+                color=cell_stats[metric_col],
+                colorscale="RdBu" if metric_col == "bias_mm" else "Viridis",
+                reversescale=(metric_col == "bias_mm"),
+                cmid=colour_midpoint,
+                colorbar=dict(title=colorbar_title),
+                line=dict(width=0.7, color="#FFFFFF"),
+                opacity=0.9,
+            ),
+            hovertemplate=(
+                "<b>Cell %{text}</b><br>Paired months: %{customdata[0]}<br>"
+                "Bias: %{customdata[1]:+.2f} mm/month<br>"
+                "MAE: %{customdata[2]:.2f} mm/month<br>"
+                "Pearson r: %{customdata[3]:.3f}<extra></extra>"
+            ),
+            name="POWER grid-cell centres",
+        ))
+        map_fig.update_geos(
+            scope="africa",
+            center=dict(lat=7.95, lon=-1.2),
+            lataxis_range=[4.0, 12.0],
+            lonaxis_range=[-4.0, 2.0],
+            showcountries=True,
+            countrycolor="#9AAEAA",
+            showland=True,
+            landcolor="#F1F4F2",
+            showocean=True,
+            oceancolor="#E7F0F0",
+            showcoastlines=True,
+            coastlinecolor="#9AAEAA",
+            projection_type="mercator",
+        )
+        map_fig.update_layout(
+            height=560,
+            margin=dict(l=0, r=0, t=10, b=0),
+            paper_bgcolor="white",
+            font=dict(color="#203744"),
+        )
+        st.plotly_chart(map_fig, use_container_width=True)
+        st.caption(
+            "Markers show the 61 retained POWER grid-cell centres. No spatial interpolation is applied. "
+            "The comparison uses approximate rectangles inferred from POWER cell-centre spacing, not official POWER polygons."
+        )
+
+        st.markdown("#### Seasonal differences")
+        seasonal = imerg_pairs.groupby("season", as_index=False).agg(
+            mean_bias=("bias_mm", "mean"),
+            median_bias=("bias_mm", "median"),
+            mean_mae=("bias_mm", lambda x: x.abs().mean()),
+            paired_months=("date", "count"),
+        )
+        season_order = ["DJF", "MAM", "JJA", "SON"]
+        seasonal["season"] = pd.Categorical(seasonal["season"], categories=season_order, ordered=True)
+        seasonal = seasonal.sort_values("season")
+        season_fig = go.Figure(go.Bar(
+            x=seasonal["season"].astype(str),
+            y=seasonal["mean_bias"],
+            text=seasonal["mean_bias"].map(lambda value: f"{value:+.1f}"),
+            textposition="outside",
+            marker=dict(color=seasonal["mean_bias"], colorscale="RdBu", reversescale=True, cmid=0),
+            hovertemplate="%{x}<br>Mean bias: %{y:+.2f} mm/month<extra></extra>",
+        ))
+        season_fig.add_hline(y=0, line_dash="dash", line_color="#526875")
+        season_fig.update_layout(
+            height=370,
+            margin=dict(l=10, r=10, t=15, b=10),
+            yaxis_title="IMERG − POWER (mm/month)",
+            xaxis_title="Season",
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(color="#203744"),
+        )
+        st.plotly_chart(season_fig, use_container_width=True)
+        st.caption("Seasonal values are pooled descriptive comparisons across cells and years. Seasonal rainfall totals differ substantially, so absolute errors should be interpreted alongside rainfall magnitude.")
+
+        st.markdown("#### How the difference changed over time")
+        annual = imerg_pairs.groupby("year", as_index=False).agg(
+            mean_bias=("bias_mm", "mean"),
+            mean_mae=("bias_mm", lambda x: x.abs().mean()),
+            power_mean=("power_month_total_mm", "mean"),
+            imerg_mean=("imerg_month_total_mm", "mean"),
+            paired_months=("date", "count"),
+        )
+        annual_fig = go.Figure()
+        annual_fig.add_trace(go.Bar(
+            x=annual["year"], y=annual["mean_bias"],
+            name="Mean bias",
+            marker=dict(color=annual["mean_bias"], colorscale="RdBu", reversescale=True, cmid=0),
+            hovertemplate="%{x}<br>Bias: %{y:+.2f} mm/month<extra></extra>",
+        ))
+        annual_fig.add_hline(y=0, line_dash="dash", line_color="#526875")
+        annual_fig.update_layout(
+            height=390,
+            margin=dict(l=10, r=10, t=15, b=10),
+            xaxis_title="Year",
+            yaxis_title="Mean bias across cell-months (mm/month)",
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(color="#203744"),
+        )
+        st.plotly_chart(annual_fig, use_container_width=True)
+        st.caption("Annual means are descriptive. The final year, 2025, contains January to September only. No trend or significance claim is made from this comparison plot.")
+
+        st.markdown("#### Cell-level diagnostics")
+        show_cells = cell_stats.sort_values("bias_mm")
+        st.dataframe(
+            show_cells.rename(columns={
+                "cell_id": "POWER cell",
+                "latitude": "Latitude",
+                "longitude": "Longitude",
+                "bias_mm": "Mean bias (mm/month)",
+                "mae_mm": "MAE (mm/month)",
+                "pearson_r": "Pearson r",
+                "n_pairs": "Paired months",
+            }).round(3),
+            hide_index=True,
+            use_container_width=True,
+        )
+        st.download_button(
+            "Download cell-level comparison (CSV)",
+            show_cells.to_csv(index=False),
+            file_name="earthscope_ghana_imerg_power_cell_comparison.csv",
+            mime="text/csv",
+            key="download_imerg_power_cell_metrics",
+        )
+
+        with st.expander("Data, methods and limitations"):
+            st.markdown(
+                "**Products:** NASA GPM IMERG V07 Final monthly precipitation and NASA POWER "
+                "PRECTOTCORR, January 1998 to September 2025. The IMERG monthly rate (mm/hour) "
+                "and POWER daily rate (mm/day) were each converted to monthly totals using the "
+                "actual number of hours or days in each month, including leap years. "
+                "Only paired, valid cell-months are compared. Missing months are not filled."
+            )
+            st.markdown(
+                "**Coverage:** all 61 cells have 333 paired months each (20,313 pairs total). "
+                "The median number of valid IMERG pixels contributing to each cell-month is 42."
+            )
+            st.markdown(
+                "**Important:** this is a cross-product consistency assessment, not independent "
+                "rain-gauge validation. IMERG Final includes gauge adjustment, while POWER "
+                "PRECTOTCORR uses a separate observation-corrected reanalysis forcing chain. "
+                "Both products are therefore gauge-informed in different ways. Agreement does "
+                "not establish which product is closer to rainfall observed at the ground."
+            )
+            st.markdown(
+                "The approximate POWER cell rectangles were inferred from centre spacing for "
+                "spatial aggregation. They are not official NASA POWER polygons. The map plots "
+                "cell centres only and does not interpolate between them. Product differences "
+                "may reflect retrieval algorithms, spatial support, gauge adjustment, and "
+                "representation of convective rainfall."
+            )
+            st.markdown(
+                "**Interpretation:** the strongest seasonal negative IMERG-minus-POWER "
+                "differences occur in JJA and SON. These are descriptive differences, not "
+                "evidence of a systematic error in either product. Independent station or "
+                "gauge data are required for validation."
+            )
+            st.markdown(
+                "IMERG Final V07 is used only through September 2025. No V07 Early/Late or "
+                "V08 data are blended into this record."
+            )
 
 st.divider()
 st.caption("EarthScope · Research prototype · Interpret results with the documented data and methodological limitations.")
