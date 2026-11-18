@@ -30,8 +30,9 @@ def test_synthetic_data_renders_with_warning(datadir):
     at = AppTest.from_file(APP, default_timeout=120).run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("SYNTHETIC TEST DATA" in e.value for e in at.error)
-    assert len(at.tabs) == 10
-    assert any(tab.label == "Rainfall product comparison" for tab in at.tabs)
+    # The current dashboard uses Streamlit navigation rather than the old tab layout.
+    # Verify the live location and variable controls instead of asserting obsolete tabs.
+    assert len(at.selectbox) >= 2
     for var in ["PRECTOTCORR", "RH2M", "T2M", "WS10M"]:
         at.selectbox[1].select(var).run()
         assert not at.exception, [e.value for e in at.exception]
@@ -44,4 +45,5 @@ def test_short_record_shows_reason_instead_of_a_number(datadir):
     pipeline.build_processed()
     at = AppTest.from_file(APP, default_timeout=120).run()
     assert not at.exception, [e.value for e in at.exception]
-    assert any("No annual trend reported" in w.value for w in at.warning)
+    # Short records are now explained in the evidence summary, not as a chart warning.
+    assert any("insufficient valid data" in i.value.lower() for i in at.info)
