@@ -16,14 +16,12 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-# The repository's existing modules are imported as the namespace package
-# "earthscope" by the Streamlit application. Keep that import convention.
+# The project configuration lives in the repository-root config.py module.
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REPO_PARENT = REPO_ROOT.parent
-if str(REPO_PARENT) not in sys.path:
-    sys.path.insert(0, str(REPO_PARENT))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-from earthscope import config  # noqa: E402
+import config  # noqa: E402
 
 API_VERSION = "1.0.0"
 PROCESSED_DIR = config.data_dir() / "processed"
