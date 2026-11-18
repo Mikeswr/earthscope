@@ -89,3 +89,39 @@ def test_trends_endpoint_rejects_unknown_location_and_variable():
     bad_variable = client.get("/api/v1/trends", params={"variable": "UNKNOWN"})
     assert bad_location.status_code == 422
     assert bad_variable.status_code == 422
+
+def test_real_processed_trend_matches_lumosx_contract():
+    """Exercise the committed processed data through the API, not a mocked row."""
+    main._trend_records.cache_clear()
+    response = client.get(
+        "/api/v1/trends",
+        params={"location": "Accra", "variable": "T2M"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 1
+    assert payload["data_kind"] == "gridded_estimate_not_station_observation"
+
+    result = payload["results"][0]
+    required_fields = {
+        "location",
+        "variable",
+        "unit",
+        "first_year",
+        "last_year",
+        "sen_per_decade",
+        "mk_trend",
+        "mk_p_fdr",
+        "significant_fdr",
+        "evidence_class",
+    }
+    assert required_fields.issubset(result)
+    assert result["location"] == "Accra"
+    assert result["variable"] == "T2M"
+    assert isinstance(result["first_year"], int)
+    assert isinstance(result["last_year"], int)
+    assert isinstance(result["sen_per_decade"], (int, float))
+    assert isinstance(result["mk_p_fdr"], (int, float))
+    assert isinstance(result["significant_fdr"], bool)
+    assert result["evidence_class"]
+    main._trend_records.cache_clear()
