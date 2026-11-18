@@ -125,3 +125,38 @@ def test_real_processed_trend_matches_lumosx_contract():
     assert isinstance(result["significant_fdr"], bool)
     assert result["evidence_class"]
     main._trend_records.cache_clear()
+
+
+def test_all_35_location_variable_combinations_return_real_processed_rows():
+    """Verify every configured location-variable pair resolves to one processed result."""
+    main._trend_records.cache_clear()
+    locations = client.get("/api/v1/locations")
+    variables = client.get("/api/v1/variables")
+    assert locations.status_code == 200
+    assert variables.status_code == 200
+
+    location_names = [item["name"] for item in locations.json()["locations"]]
+    variable_codes = [item["code"] for item in variables.json()["variables"]]
+    assert len(location_names) == 5
+    assert len(variable_codes) == 7
+
+    checked = set()
+    for location_name in location_names:
+        for variable_code in variable_codes:
+            response = client.get(
+                "/api/v1/trends",
+                params={"location": location_name, "variable": variable_code},
+            )
+            assert response.status_code == 200, (location_name, variable_code, response.text)
+            payload = response.json()
+            assert payload["count"] == 1, (location_name, variable_code, payload["count"])
+            result = payload["results"][0]
+            assert result["location"] == location_name
+            assert result["variable"] == variable_code
+            assert result["source"] == "NASA POWER"
+            assert result["data_kind"] == "gridded_estimate_not_station_observation"
+            assert result["first_year"] <= result["last_year"]
+            checked.add((location_name, variable_code))
+
+    assert len(checked) == 35
+    main._trend_records.cache_clear()
